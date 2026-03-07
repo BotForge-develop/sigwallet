@@ -1,15 +1,14 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
 import ContactAvatar from '@/components/ContactAvatar';
 import NumPad from '@/components/NumPad';
 import TransferModal from '@/components/TransferModal';
-import { contacts, type Contact } from '@/lib/mockData';
+import { useContacts, type DbContact } from '@/hooks/useContacts';
 import { ArrowLeft } from 'lucide-react';
 
 const Transfer = () => {
-  const navigate = useNavigate();
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const { contacts, loading } = useContacts();
+  const [selectedContact, setSelectedContact] = useState<DbContact | null>(null);
   const [amount, setAmount] = useState('');
   const [showModal, setShowModal] = useState(false);
 
@@ -39,13 +38,23 @@ const Transfer = () => {
 
       {!selectedContact ? (
         <>
-          {/* Contacts grid */}
           <p className="text-sm text-muted-foreground mb-4">Choose a contact</p>
-          <div className="grid grid-cols-4 gap-4">
-            {contacts.map((c, i) => (
-              <ContactAvatar key={c.id} contact={c} index={i} onSelect={setSelectedContact} />
-            ))}
-          </div>
+          {loading ? (
+            <div className="text-center text-muted-foreground text-sm py-8">Loading...</div>
+          ) : contacts.length === 0 ? (
+            <div className="text-center text-muted-foreground text-sm py-8">No contacts yet. Add contacts in your profile.</div>
+          ) : (
+            <div className="grid grid-cols-4 gap-4">
+              {contacts.map((c, i) => (
+                <ContactAvatar
+                  key={c.id}
+                  contact={c}
+                  index={i}
+                  onSelect={() => setSelectedContact(c)}
+                />
+              ))}
+            </div>
+          )}
         </>
       ) : (
         <motion.div
