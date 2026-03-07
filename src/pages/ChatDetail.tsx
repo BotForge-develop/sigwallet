@@ -4,13 +4,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Send, Banknote } from 'lucide-react';
 import NumPad from '@/components/NumPad';
 import TransferModal from '@/components/TransferModal';
-import { contacts, mockChats, currentUser, type ChatMessage } from '@/lib/mockData';
+import { useContacts } from '@/hooks/useContacts';
+import { useChats } from '@/hooks/useChats';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ChatDetail = () => {
   const { contactId } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { contacts } = useContacts();
   const contact = contacts.find((c) => c.id === contactId);
-  const [messages, setMessages] = useState<ChatMessage[]>(mockChats[contactId || ''] || []);
+  const { messages, sendMessage, sendTransfer } = useChats(contactId);
   const [input, setInput] = useState('');
   const [showNumPad, setShowNumPad] = useState(false);
   const [sendAmount, setSendAmount] = useState('');
@@ -21,18 +25,15 @@ const ChatDetail = () => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages]);
 
-  if (!contact) return null;
+  if (!contact) return (
+    <div className="min-h-screen flex items-center justify-center text-muted-foreground text-sm">
+      Contact not found
+    </div>
+  );
 
   const handleSendMessage = () => {
     if (!input.trim()) return;
-    const msg: ChatMessage = {
-      id: `m-${Date.now()}`,
-      senderId: currentUser.id,
-      text: input,
-      timestamp: new Date().toISOString(),
-      type: 'text',
-    };
-    setMessages((prev) => [...prev, msg]);
+    sendMessage(input);
     setInput('');
   };
 
@@ -42,14 +43,7 @@ const ChatDetail = () => {
   };
 
   const handleTransferSuccess = () => {
-    const msg: ChatMessage = {
-      id: `m-${Date.now()}`,
-      senderId: currentUser.id,
-      amount: parseFloat(sendAmount),
-      timestamp: new Date().toISOString(),
-      type: 'transfer',
-    };
-    setMessages((prev) => [...prev, msg]);
+    sendTransfer(parseFloat(sendAmount));
     setSendAmount('');
     setShowNumPad(false);
   };
@@ -78,9 +72,9 @@ const ChatDetail = () => {
       {/* Messages */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-5 py-4 space-y-3">
         {messages.map((msg) => {
-          const isMe = msg.senderId === currentUser.id;
+          const isMe = msg.sender_id === user?.id;
 
-          if (msg.type === 'transfer') {
+          if (msg.message_type === 'transfer') {
             return (
               <motion.div
                 key={msg.id}

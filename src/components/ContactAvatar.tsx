@@ -1,10 +1,9 @@
 import { motion } from 'framer-motion';
-import type { Contact } from '@/lib/mockData';
 
 interface ContactAvatarProps {
-  contact: Contact;
+  contact: { id: string; name: string; initials: string };
   index: number;
-  onSelect: (contact: Contact) => void;
+  onSelect: () => void;
   size?: 'sm' | 'md';
 }
 
@@ -18,7 +17,7 @@ const ContactAvatar = ({ contact, index, onSelect, size = 'md' }: ContactAvatarP
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: index * 0.06, type: 'spring', stiffness: 200 }}
       whileTap={{ scale: 0.9 }}
-      onClick={() => onSelect(contact)}
+      onClick={onSelect}
     >
       <div className={`${sizeClass} rounded-full gradient-beige flex items-center justify-center font-semibold text-primary-foreground`}>
         {contact.initials}
