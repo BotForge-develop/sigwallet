@@ -14,7 +14,158 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      chats: {
+        Row: {
+          amount: number | null
+          created_at: string
+          id: string
+          message_type: string
+          recipient_contact_id: string | null
+          sender_id: string
+          text: string | null
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          id?: string
+          message_type?: string
+          recipient_contact_id?: string | null
+          sender_id: string
+          text?: string | null
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          id?: string
+          message_type?: string
+          recipient_contact_id?: string | null
+          sender_id?: string
+          text?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chats_recipient_contact_id_fkey"
+            columns: ["recipient_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          iban: string | null
+          id: string
+          initials: string
+          name: string
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          iban?: string | null
+          id?: string
+          initials: string
+          name: string
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          iban?: string | null
+          id?: string
+          initials?: string
+          name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          api_endpoint_url: string | null
+          avatar_url: string | null
+          created_at: string
+          custom_iban: string | null
+          display_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          api_endpoint_url?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          custom_iban?: string | null
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          api_endpoint_url?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          custom_iban?: string | null
+          display_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      transactions: {
+        Row: {
+          amount: number
+          booking_text: string | null
+          category: string | null
+          counterpart_iban: string | null
+          counterpart_name: string | null
+          created_at: string
+          currency: string | null
+          date: string
+          external_id: string | null
+          icon: string | null
+          id: string
+          name: string
+          synced_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          booking_text?: string | null
+          category?: string | null
+          counterpart_iban?: string | null
+          counterpart_name?: string | null
+          created_at?: string
+          currency?: string | null
+          date: string
+          external_id?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          synced_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          booking_text?: string | null
+          category?: string | null
+          counterpart_iban?: string | null
+          counterpart_name?: string | null
+          created_at?: string
+          currency?: string | null
+          date?: string
+          external_id?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          synced_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
