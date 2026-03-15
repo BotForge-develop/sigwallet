@@ -81,6 +81,7 @@ const WalletPage = () => {
     try {
       const hdWallet = ethers.HDNodeWallet.fromPhrase(decrypted);
       setWallet(hdWallet);
+      setMnemonic(decrypted);
       setStep('dashboard');
     } catch {
       // Wrong PIN — decrypted gibberish
@@ -170,7 +171,7 @@ const WalletPage = () => {
 
         {step === 'dashboard' && wallet && (
           <motion.div key="dashboard" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <WalletDashboard wallet={wallet} rpcUrl={RPC_URL} />
+            <WalletDashboard wallet={wallet} rpcUrl={RPC_URL} mnemonic={mnemonic} />
           </motion.div>
         )}
       </AnimatePresence>
