@@ -1,37 +1,37 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
-import { ethers } from 'ethers';
+import { X, Send, Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import { sendTransaction, COINS, CoinType, getTxExplorerUrl } from '@/lib/cryptoUtils';
 
 interface SendModalProps {
   open: boolean;
   onClose: () => void;
-  wallet: ethers.HDNodeWallet | null;
+  mnemonic: string;
+  coin: CoinType;
   rpcUrl: string;
 }
 
-const SendModal = ({ open, onClose, wallet, rpcUrl }: SendModalProps) => {
+const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl }: SendModalProps) => {
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
   const [status, setStatus] = useState<'idle' | 'signing' | 'sent' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
+  const [explorerUrl, setExplorerUrl] = useState('');
   const [error, setError] = useState('');
 
+  const coinInfo = COINS.find(c => c.id === coin)!;
+
   const handleSend = async () => {
-    if (!wallet || !to || !amount) return;
+    if (!mnemonic || !to || !amount) return;
 
     try {
       setStatus('signing');
       setError('');
-      const provider = new ethers.JsonRpcProvider(rpcUrl);
-      const signer = wallet.connect(provider);
 
-      const tx = await signer.sendTransaction({
-        to,
-        value: ethers.parseEther(amount),
-      });
+      const result = await sendTransaction(mnemonic, coin, to, amount, rpcUrl);
 
-      setTxHash(tx.hash);
+      setTxHash(result.txHash);
+      setExplorerUrl(result.explorerUrl);
       setStatus('sent');
     } catch (err: any) {
       setError(err.message || 'Transaction failed');
@@ -44,9 +44,12 @@ const SendModal = ({ open, onClose, wallet, rpcUrl }: SendModalProps) => {
     setAmount('');
     setStatus('idle');
     setTxHash('');
+    setExplorerUrl('');
     setError('');
     onClose();
   };
+
+  const placeholder = coin === 'eth' ? '0x...' : coin === 'btc' ? '1... or bc1...' : 'L... or ltc1...';
 
   return (
     <AnimatePresence>
@@ -69,7 +72,10 @@ const SendModal = ({ open, onClose, wallet, rpcUrl }: SendModalProps) => {
             <div className="glass-strong rounded-t-3xl p-6 safe-bottom">
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-lg font-semibold text-foreground">Send ETH</h3>
+                <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
+                  <span className="text-xl">{coinInfo.icon}</span>
+                  Send {coinInfo.symbol}
+                </h3>
                 <button onClick={handleClose} className="w-8 h-8 rounded-full glass flex items-center justify-center">
                   <X size={16} className="text-muted-foreground" />
                 </button>
@@ -77,29 +83,35 @@ const SendModal = ({ open, onClose, wallet, rpcUrl }: SendModalProps) => {
 
               {status === 'idle' && (
                 <>
-                  {/* To address */}
                   <div className="mb-4">
                     <label className="text-xs text-muted-foreground mb-1.5 block">Recipient Address</label>
                     <input
                       className="w-full h-12 rounded-xl glass px-4 text-sm text-foreground placeholder:text-muted-foreground bg-transparent outline-none font-mono"
-                      placeholder="0x..."
+                      placeholder={placeholder}
                       value={to}
                       onChange={(e) => setTo(e.target.value)}
                     />
                   </div>
 
-                  {/* Amount */}
                   <div className="mb-6">
-                    <label className="text-xs text-muted-foreground mb-1.5 block">Amount (ETH)</label>
+                    <label className="text-xs text-muted-foreground mb-1.5 block">
+                      Amount ({coinInfo.symbol})
+                    </label>
                     <input
                       type="number"
                       className="w-full h-12 rounded-xl glass px-4 text-sm text-foreground placeholder:text-muted-foreground bg-transparent outline-none"
                       placeholder="0.0"
                       value={amount}
                       onChange={(e) => setAmount(e.target.value)}
-                      step="0.001"
+                      step={coin === 'eth' ? '0.001' : '0.00000001'}
                     />
                   </div>
+
+                  {coin !== 'eth' && (
+                    <p className="text-xs text-muted-foreground mb-4 text-center">
+                      Signed locally & broadcast via BlockCypher
+                    </p>
+                  )}
 
                   <motion.button
                     className="w-full h-14 rounded-2xl gradient-beige text-primary-foreground font-semibold flex items-center justify-center gap-2"
@@ -117,7 +129,9 @@ const SendModal = ({ open, onClose, wallet, rpcUrl }: SendModalProps) => {
                 <div className="flex flex-col items-center py-8">
                   <Loader2 size={40} className="text-beige animate-spin mb-4" />
                   <p className="text-foreground font-medium">Signing transaction...</p>
-                  <p className="text-xs text-muted-foreground mt-1">Please wait</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {coin === 'eth' ? 'Broadcasting to network' : 'Creating & signing UTXO transaction'}
+                  </p>
                 </div>
               )}
 
@@ -131,9 +145,19 @@ const SendModal = ({ open, onClose, wallet, rpcUrl }: SendModalProps) => {
                     <CheckCircle size={48} className="text-success mb-4" />
                   </motion.div>
                   <p className="text-foreground font-medium mb-2">Transaction Sent!</p>
-                  <p className="text-xs text-muted-foreground font-mono break-all text-center px-4">
+                  <p className="text-xs text-muted-foreground font-mono break-all text-center px-4 mb-4">
                     {txHash}
                   </p>
+                  {explorerUrl && (
+                    <motion.button
+                      className="h-10 px-5 rounded-xl glass text-sm text-foreground flex items-center gap-2"
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => window.open(explorerUrl, '_blank')}
+                    >
+                      <ExternalLink size={14} />
+                      View on Explorer
+                    </motion.button>
+                  )}
                 </div>
               )}
 
