@@ -44,6 +44,7 @@ const AppRoutes = () => {
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/transfer" element={<ProtectedRoute><Transfer /></ProtectedRoute>} />
+          <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
           <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/chat/:contactId" element={<ProtectedRoute><ChatDetail /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

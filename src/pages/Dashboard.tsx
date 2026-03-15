@@ -41,7 +41,7 @@ const Dashboard = () => {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.5, type: 'spring' }}
       >
-        <BankCard last4="4291" />
+        <BankCard3D last4="4291" />
       </motion.div>
 
       {/* Balance */}
