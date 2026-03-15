@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import BankCard from '@/components/BankCard';
+import BankCard3D from '@/components/BankCard3D';
 import SpendingChart from '@/components/SpendingChart';
 import TransactionRow from '@/components/TransactionRow';
 import { useProfile } from '@/hooks/useProfile';
@@ -41,7 +41,7 @@ const Dashboard = () => {
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1, duration: 0.5, type: 'spring' }}
       >
-        <BankCard last4="4291" />
+        <BankCard3D last4="4291" />
       </motion.div>
 
       {/* Balance */}
