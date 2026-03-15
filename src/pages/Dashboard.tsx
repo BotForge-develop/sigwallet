@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import BankCard from '@/components/BankCard';
+import BankCard3D from '@/components/BankCard3D';
 import SpendingChart from '@/components/SpendingChart';
 import TransactionRow from '@/components/TransactionRow';
 import { useProfile } from '@/hooks/useProfile';
