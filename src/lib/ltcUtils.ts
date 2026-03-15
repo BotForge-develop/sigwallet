@@ -1,5 +1,7 @@
 import { ethers } from 'ethers';
+// @ts-ignore - noble/hashes subpath exports work at runtime
 import { sha256 } from '@noble/hashes/sha256';
+// @ts-ignore - noble/hashes subpath exports work at runtime
 import { ripemd160 } from '@noble/hashes/ripemd160';
 import { base58check } from '@scure/base';
 
