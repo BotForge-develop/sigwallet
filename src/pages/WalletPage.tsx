@@ -81,6 +81,7 @@ const WalletPage = () => {
     try {
       const hdWallet = ethers.HDNodeWallet.fromPhrase(decrypted);
       setWallet(hdWallet);
+      setMnemonic(decrypted);
       setStep('dashboard');
     } catch {
       // Wrong PIN — decrypted gibberish
