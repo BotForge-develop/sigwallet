@@ -17,6 +17,8 @@ const COINS_MAP: Record<string, { symbol: string; icon: string }> = {
   solana: { symbol: 'SOL', icon: '◎' },
   toncoin: { symbol: 'TON', icon: '💎' },
   ripple: { symbol: 'XRP', icon: '✕' },
+  dogecoin: { symbol: 'DOGE', icon: '🐕' },
+  cardano: { symbol: 'ADA', icon: '₳' },
 };
 
 const COIN_IDS = Object.keys(COINS_MAP).join(',');
@@ -28,7 +30,7 @@ export function useCryptoPrices() {
   const fetchPrices = useCallback(async () => {
     try {
       const res = await fetch(
-        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=eur&ids=${COIN_IDS}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`
+        `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${COIN_IDS}&order=market_cap_desc&sparkline=true&price_change_percentage=24h`
       );
       if (!res.ok) return;
       const data = await res.json();
@@ -51,7 +53,7 @@ export function useCryptoPrices() {
 
   useEffect(() => {
     fetchPrices();
-    const interval = setInterval(fetchPrices, 30000); // refresh every 30s
+    const interval = setInterval(fetchPrices, 30000);
     return () => clearInterval(interval);
   }, [fetchPrices]);
 

@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Send, Loader2, AlertCircle, CheckCircle, ExternalLink } from 'lucide-react';
+import { X, Send, Loader2, AlertCircle, CheckCircle, ExternalLink, DollarSign, Coins } from 'lucide-react';
 import { sendTransaction, COINS, CoinType, getTxExplorerUrl } from '@/lib/cryptoUtils';
 
 interface SendModalProps {
@@ -9,11 +9,13 @@ interface SendModalProps {
   mnemonic: string;
   coin: CoinType;
   rpcUrl: string;
+  usdPrice?: number;
 }
 
-const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl }: SendModalProps) => {
+const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl, usdPrice }: SendModalProps) => {
   const [to, setTo] = useState('');
   const [amount, setAmount] = useState('');
+  const [inputMode, setInputMode] = useState<'usd' | 'crypto'>('usd');
   const [status, setStatus] = useState<'idle' | 'signing' | 'sent' | 'error'>('idle');
   const [txHash, setTxHash] = useState('');
   const [explorerUrl, setExplorerUrl] = useState('');
@@ -21,15 +23,24 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl }: SendModalProps) =>
 
   const coinInfo = COINS.find(c => c.id === coin)!;
 
-  const handleSend = async () => {
-    if (!mnemonic || !to || !amount) return;
+  // Convert between USD and crypto
+  const converted = useMemo(() => {
+    const val = parseFloat(amount) || 0;
+    if (!usdPrice || usdPrice === 0) return { crypto: val.toString(), usd: '0' };
+    if (inputMode === 'usd') {
+      return { crypto: (val / usdPrice).toFixed(8), usd: val.toFixed(2) };
+    }
+    return { crypto: val.toFixed(8), usd: (val * usdPrice).toFixed(2) };
+  }, [amount, inputMode, usdPrice]);
 
+  const cryptoAmount = inputMode === 'usd' ? converted.crypto : amount;
+
+  const handleSend = async () => {
+    if (!mnemonic || !to || !cryptoAmount || parseFloat(cryptoAmount) <= 0) return;
     try {
       setStatus('signing');
       setError('');
-
-      const result = await sendTransaction(mnemonic, coin, to, amount, rpcUrl);
-
+      const result = await sendTransaction(mnemonic, coin, to, cryptoAmount, rpcUrl);
       setTxHash(result.txHash);
       setExplorerUrl(result.explorerUrl);
       setStatus('sent');
@@ -70,7 +81,6 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl }: SendModalProps) =>
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           >
             <div className="glass-strong rounded-t-3xl p-6 safe-bottom">
-              {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <span className="text-xl">{coinInfo.icon}</span>
@@ -83,6 +93,7 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl }: SendModalProps) =>
 
               {status === 'idle' && (
                 <>
+                  {/* Recipient */}
                   <div className="mb-4">
                     <label className="text-xs text-muted-foreground mb-1.5 block">Recipient Address</label>
                     <input
@@ -93,18 +104,51 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl }: SendModalProps) =>
                     />
                   </div>
 
-                  <div className="mb-6">
-                    <label className="text-xs text-muted-foreground mb-1.5 block">
-                      Amount ({coinInfo.symbol})
-                    </label>
-                    <input
-                      type="number"
-                      className="w-full h-12 rounded-xl glass px-4 text-sm text-foreground placeholder:text-muted-foreground bg-transparent outline-none"
-                      placeholder="0.0"
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      step={coin === 'eth' ? '0.001' : '0.00000001'}
-                    />
+                  {/* Amount with USD/Crypto toggle */}
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs text-muted-foreground">Amount</label>
+                      {usdPrice && (
+                        <button
+                          className="flex items-center gap-1 text-[10px] text-beige font-medium px-2 py-0.5 rounded-lg glass"
+                          onClick={() => {
+                            setInputMode(prev => prev === 'usd' ? 'crypto' : 'usd');
+                            setAmount('');
+                          }}
+                        >
+                          {inputMode === 'usd' ? <DollarSign size={10} /> : <Coins size={10} />}
+                          {inputMode === 'usd' ? 'USD' : coinInfo.symbol}
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        className="w-full h-12 rounded-xl glass px-4 pr-16 text-sm text-foreground placeholder:text-muted-foreground bg-transparent outline-none"
+                        placeholder={inputMode === 'usd' ? '0.00' : '0.0'}
+                        value={amount}
+                        onChange={(e) => setAmount(e.target.value)}
+                        step={inputMode === 'usd' ? '0.01' : coin === 'eth' ? '0.001' : '0.00000001'}
+                      />
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">
+                        {inputMode === 'usd' ? 'USD' : coinInfo.symbol}
+                      </span>
+                    </div>
+
+                    {/* Conversion display */}
+                    {usdPrice && amount && parseFloat(amount) > 0 && (
+                      <motion.p
+                        className="text-xs text-muted-foreground mt-2 text-center"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                      >
+                        {inputMode === 'usd' ? (
+                          <>≈ {parseFloat(converted.crypto).toFixed(6)} {coinInfo.symbol}</>
+                        ) : (
+                          <>≈ ${converted.usd}</>
+                        )}
+                      </motion.p>
+                    )}
                   </div>
 
                   {coin !== 'eth' && (
@@ -114,13 +158,16 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl }: SendModalProps) =>
                   )}
 
                   <motion.button
-                    className="w-full h-14 rounded-2xl gradient-beige text-primary-foreground font-semibold flex items-center justify-center gap-2"
+                    className="w-full h-14 rounded-2xl gradient-beige text-primary-foreground font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
                     whileTap={{ scale: 0.97 }}
                     onClick={handleSend}
-                    disabled={!to || !amount}
+                    disabled={!to || !amount || parseFloat(amount) <= 0}
                   >
                     <Send size={18} />
-                    Sign & Send
+                    Send {cryptoAmount && parseFloat(cryptoAmount) > 0
+                      ? `${parseFloat(cryptoAmount).toFixed(6)} ${coinInfo.symbol}`
+                      : coinInfo.symbol}
+                    {inputMode === 'usd' && amount && ` ($${parseFloat(amount).toFixed(2)})`}
                   </motion.button>
                 </>
               )}
@@ -137,17 +184,11 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl }: SendModalProps) =>
 
               {status === 'sent' && (
                 <div className="flex flex-col items-center py-8">
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: 'spring', stiffness: 200 }}
-                  >
+                  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200 }}>
                     <CheckCircle size={48} className="text-success mb-4" />
                   </motion.div>
                   <p className="text-foreground font-medium mb-2">Transaction Sent!</p>
-                  <p className="text-xs text-muted-foreground font-mono break-all text-center px-4 mb-4">
-                    {txHash}
-                  </p>
+                  <p className="text-xs text-muted-foreground font-mono break-all text-center px-4 mb-4">{txHash}</p>
                   {explorerUrl && (
                     <motion.button
                       className="h-10 px-5 rounded-xl glass text-sm text-foreground flex items-center gap-2"
