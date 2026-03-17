@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, Check, Send, RefreshCw, Wallet, ExternalLink } from 'lucide-react';
+import { Copy, Check, Send, RefreshCw, Wallet, ExternalLink, Zap } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import SendModal from './SendModal';
+import BuyCryptoModal from './BuyCryptoModal';
+import { saveWalletAddresses } from '@/hooks/useWalletAddresses';
+import { useCryptoPrices } from '@/hooks/useCryptoPrices';
 import {
   COINS,
   CoinType,
@@ -18,17 +21,22 @@ interface WalletDashboardProps {
   mnemonic: string;
 }
 
+const COIN_ID_MAP: Record<string, string> = {
+  btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin',
+};
+
 const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => {
   const [selectedCoin, setSelectedCoin] = useState<CoinType>('eth');
   const [copied, setCopied] = useState(false);
   const [showSend, setShowSend] = useState(false);
+  const [showBuy, setShowBuy] = useState(false);
+  const { prices } = useCryptoPrices();
 
-  // Addresses for each coin
   const [addresses, setAddresses] = useState<Record<CoinType, string>>({ eth: '', btc: '', ltc: '' });
   const [balances, setBalances] = useState<Record<CoinType, string | null>>({ eth: null, btc: null, ltc: null });
   const [loading, setLoading] = useState<Record<CoinType, boolean>>({ eth: false, btc: false, ltc: false });
 
-  // Derive all addresses on mount
+  // Derive all addresses on mount & save to localStorage
   useEffect(() => {
     if (!mnemonic) return;
     const derived: Record<CoinType, string> = { eth: '', btc: '', ltc: '' };
@@ -40,6 +48,7 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
       }
     }
     setAddresses(derived);
+    saveWalletAddresses(derived);
   }, [mnemonic]);
 
   const refreshBalance = async (coin: CoinType) => {
@@ -51,7 +60,6 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
     setLoading(prev => ({ ...prev, [coin]: false }));
   };
 
-  // Fetch balance when address is ready or coin changes
   useEffect(() => {
     if (addresses[selectedCoin]) {
       refreshBalance(selectedCoin);
@@ -65,6 +73,10 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
   const shortAddress = currentAddress
     ? `${currentAddress.slice(0, 6)}...${currentAddress.slice(-4)}`
     : '...';
+
+  const balNum = currentBalance && currentBalance !== '—' ? parseFloat(currentBalance) : 0;
+  const usdPrice = prices.find(p => p.id === COIN_ID_MAP[selectedCoin])?.current_price || 0;
+  const usdValue = balNum * usdPrice;
 
   const handleCopy = () => {
     if (!currentAddress) return;
@@ -122,11 +134,23 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
               <RefreshCw size={14} className={`text-muted-foreground ${isLoading ? 'animate-spin' : ''}`} />
             </button>
           </div>
+          {usdValue > 0 && (
+            <p className="text-sm text-beige-muted mt-1">
+              ≈ ${usdValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+          )}
         </div>
 
         {/* QR Code */}
-        <div className="glass rounded-2xl p-5 mb-5 flex flex-col items-center">
-          <div className="bg-foreground rounded-xl p-3 mb-4">
+        <motion.div
+          className="glass rounded-2xl p-5 mb-5 flex flex-col items-center"
+          style={{ perspective: 1000 }}
+        >
+          <motion.div
+            className="bg-foreground rounded-xl p-3 mb-4"
+            whileHover={{ rotateY: 10, rotateX: -5, scale: 1.02 }}
+            transition={{ type: 'spring', stiffness: 300 }}
+          >
             <QRCodeSVG
               value={currentAddress || ''}
               size={140}
@@ -134,12 +158,12 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
               fgColor="hsl(0, 0%, 0%)"
               level="M"
             />
-          </div>
+          </motion.div>
           <button onClick={handleCopy} className="flex items-center gap-2 glass rounded-xl px-4 py-2.5">
             {copied ? <Check size={14} className="text-success" /> : <Copy size={14} className="text-muted-foreground" />}
             <span className="text-xs font-mono text-foreground">{shortAddress}</span>
           </button>
-        </div>
+        </motion.div>
 
         {/* Actions */}
         <div className="flex gap-3">
@@ -149,7 +173,15 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
             onClick={() => setShowSend(true)}
           >
             <Send size={18} />
-            Send {coinInfo.symbol}
+            Send
+          </motion.button>
+          <motion.button
+            className="flex-1 h-14 rounded-2xl glass text-foreground font-semibold flex items-center justify-center gap-2"
+            whileTap={{ scale: 0.97 }}
+            onClick={() => setShowBuy(true)}
+          >
+            <Zap size={18} className="text-beige" />
+            Buy
           </motion.button>
           <motion.button
             className="h-14 w-14 rounded-2xl glass flex items-center justify-center"
@@ -167,6 +199,13 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
         mnemonic={mnemonic}
         coin={selectedCoin}
         rpcUrl={rpcUrl}
+        usdPrice={usdPrice}
+      />
+      <BuyCryptoModal
+        open={showBuy}
+        onClose={() => setShowBuy(false)}
+        defaultCoin={selectedCoin}
+        walletAddress={currentAddress}
       />
     </>
   );
