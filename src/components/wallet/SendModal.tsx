@@ -56,14 +56,14 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl }: SendModalProps) =>
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50"
+            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={handleClose}
           />
           <motion.div
-            className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto"
+            className="fixed bottom-0 left-0 right-0 z-[70] max-w-md mx-auto"
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
