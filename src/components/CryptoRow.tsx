@@ -5,43 +5,55 @@ import type { CryptoPrice } from '@/hooks/useCryptoPrices';
 interface CryptoRowProps {
   coin: CryptoPrice;
   index: number;
+  balance?: string | null;
   onClick?: () => void;
 }
 
-const CryptoRow = ({ coin, index, onClick }: CryptoRowProps) => {
+const CryptoRow = ({ coin, index, balance, onClick }: CryptoRowProps) => {
   const isPositive = coin.price_change_percentage_24h >= 0;
+  const balanceNum = balance && balance !== '—' ? parseFloat(balance) : null;
+  const holdingValue = balanceNum !== null ? balanceNum * coin.current_price : null;
 
   return (
-    <motion.button
-      className="flex items-center gap-3 py-3 px-1 w-full text-left"
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.04, duration: 0.3 }}
+    <motion.div
+      className="flex items-center gap-3 py-3.5 px-1"
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: index * 0.05 }}
       onClick={onClick}
-      whileTap={{ scale: 0.98 }}
     >
-      <div className="w-10 h-10 rounded-xl glass flex items-center justify-center flex-shrink-0 text-lg">
+      <div className="w-10 h-10 rounded-xl glass-strong flex items-center justify-center text-lg shrink-0">
         {coin.icon}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground truncate">{coin.name}</p>
-        <p className="text-xs text-muted-foreground">{coin.symbol}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-sm font-semibold text-foreground">{coin.symbol}</p>
+          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${
+            isPositive ? 'bg-success/15 text-success' : 'bg-destructive/15 text-destructive'
+          }`}>
+            {isPositive ? '+' : ''}{coin.price_change_percentage_24h.toFixed(1)}%
+          </span>
+        </div>
+        <p className="text-xs text-muted-foreground">{coin.name}</p>
+        {balanceNum !== null && (
+          <p className="text-[10px] text-beige-muted mt-0.5">
+            {balanceNum.toFixed(balanceNum < 1 ? 6 : 4)} {coin.symbol}
+            {holdingValue !== null && ` ≈ $${holdingValue.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          </p>
+        )}
       </div>
-      <Sparkline
-        data={coin.sparkline_in_7d}
-        width={64}
-        height={28}
-        positive={isPositive}
-      />
-      <div className="text-right ml-2 min-w-[72px]">
+      <div className="w-16 h-8 shrink-0">
+        <Sparkline data={coin.sparkline_in_7d} positive={isPositive} />
+      </div>
+      <div className="text-right shrink-0 min-w-[70px]">
         <p className="text-sm font-semibold text-foreground tabular-nums">
-          €{coin.current_price.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-        </p>
-        <p className={`text-[11px] font-medium tabular-nums ${isPositive ? 'text-success' : 'text-destructive'}`}>
-          {isPositive ? '+' : ''}{coin.price_change_percentage_24h.toFixed(2)}%
+          ${coin.current_price.toLocaleString('en-US', {
+            minimumFractionDigits: coin.current_price < 1 ? 4 : 2,
+            maximumFractionDigits: coin.current_price < 1 ? 6 : 2,
+          })}
         </p>
       </div>
-    </motion.button>
+    </motion.div>
   );
 };
 
