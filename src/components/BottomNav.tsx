@@ -1,11 +1,10 @@
-import { Home, ArrowLeftRight, MessageCircle, User, Wallet } from 'lucide-react';
+import { Home, ArrowLeftRight, MessageCircle, User } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
 const tabs = [
   { icon: Home, label: 'Home', path: '/' },
   { icon: ArrowLeftRight, label: 'Transfer', path: '/transfer' },
-  { icon: Wallet, label: 'Wallet', path: '/wallet' },
   { icon: MessageCircle, label: 'Chat', path: '/chat' },
   { icon: User, label: 'Profile', path: '/profile' },
 ];
@@ -14,7 +13,6 @@ const BottomNav = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Hide on chat detail pages
   if (location.pathname.startsWith('/chat/')) return null;
 
   return (
