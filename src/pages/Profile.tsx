@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { User, Link, Palette, Shield, ChevronRight, LogOut, Plus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, Link, Palette, Shield, ChevronRight, LogOut, Plus, Check, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useContacts } from '@/hooks/useContacts';
@@ -13,6 +13,25 @@ const Profile = () => {
   const [showAddContact, setShowAddContact] = useState(false);
   const [newName, setNewName] = useState('');
   const [newIban, setNewIban] = useState('');
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const startEdit = (field: string, currentValue: string) => {
+    setEditingField(field);
+    setEditValue(currentValue || '');
+  };
+
+  const saveEdit = async () => {
+    if (!editingField) return;
+    const key = editingField === 'Edit Profile' ? 'display_name'
+      : editingField === 'API Endpoint' ? 'api_endpoint_url'
+      : editingField === 'IBAN' ? 'custom_iban' : null;
+    if (!key) return;
+    const res = await updateProfile({ [key]: editValue.trim() || null });
+    if (res?.error) toast.error(res.error.message);
+    else toast.success('Gespeichert!');
+    setEditingField(null);
+  };
 
   const handleAddContact = async () => {
     if (!newName.trim()) return;
@@ -29,15 +48,16 @@ const Profile = () => {
     {
       title: 'Account',
       items: [
-        { icon: User, label: 'Edit Profile', subtitle: profile?.display_name || 'Set your name' },
-        { icon: Link, label: 'API Endpoint', subtitle: profile?.api_endpoint_url || 'Not configured' },
+        { icon: User, label: 'Edit Profile', subtitle: profile?.display_name || 'Set your name', editable: true, value: profile?.display_name || '' },
+        { icon: Link, label: 'IBAN', subtitle: profile?.custom_iban || 'Set your IBAN', editable: true, value: profile?.custom_iban || '' },
+        { icon: Link, label: 'API Endpoint', subtitle: profile?.api_endpoint_url || 'Not configured', editable: true, value: profile?.api_endpoint_url || '' },
       ],
     },
     {
       title: 'Preferences',
       items: [
-        { icon: Palette, label: 'Appearance', subtitle: 'Dark mode' },
-        { icon: Shield, label: 'Security', subtitle: '2FA, biometrics' },
+        { icon: Palette, label: 'Appearance', subtitle: 'Dark mode', editable: false, value: '' },
+        { icon: Shield, label: 'Security', subtitle: '2FA, biometrics', editable: false, value: '' },
       ],
     },
   ];
@@ -137,16 +157,43 @@ const Profile = () => {
           </p>
           <div className="glass rounded-2xl divide-y divide-border">
             {group.items.map((item) => (
-              <button key={item.label} className="w-full flex items-center gap-3 p-4 text-left">
-                <div className="w-9 h-9 rounded-xl glass flex items-center justify-center flex-shrink-0">
-                  <item.icon size={16} className="text-muted-foreground" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{item.label}</p>
-                  <p className="text-xs text-muted-foreground">{item.subtitle}</p>
-                </div>
-                <ChevronRight size={16} className="text-muted-foreground" />
-              </button>
+              <div key={item.label}>
+                {editingField === item.label ? (
+                  <motion.div
+                    className="flex items-center gap-3 p-4"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    <div className="w-9 h-9 rounded-xl glass flex items-center justify-center flex-shrink-0">
+                      <item.icon size={16} className="text-muted-foreground" />
+                    </div>
+                    <input
+                      autoFocus
+                      className="flex-1 bg-transparent text-sm text-foreground outline-none border-b border-beige pb-1"
+                      placeholder={item.label === 'Edit Profile' ? 'Display Name' : item.label}
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                    />
+                    <button onClick={saveEdit} className="text-green-400"><Check size={16} /></button>
+                    <button onClick={() => setEditingField(null)} className="text-muted-foreground"><X size={16} /></button>
+                  </motion.div>
+                ) : (
+                  <button
+                    className="w-full flex items-center gap-3 p-4 text-left"
+                    onClick={() => item.editable && startEdit(item.label, item.value)}
+                  >
+                    <div className="w-9 h-9 rounded-xl glass flex items-center justify-center flex-shrink-0">
+                      <item.icon size={16} className="text-muted-foreground" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">{item.label}</p>
+                      <p className="text-xs text-muted-foreground">{item.subtitle}</p>
+                    </div>
+                    <ChevronRight size={16} className="text-muted-foreground" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
         </motion.div>
