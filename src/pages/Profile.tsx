@@ -48,15 +48,16 @@ const Profile = () => {
     {
       title: 'Account',
       items: [
-        { icon: User, label: 'Edit Profile', subtitle: profile?.display_name || 'Set your name' },
-        { icon: Link, label: 'API Endpoint', subtitle: profile?.api_endpoint_url || 'Not configured' },
+        { icon: User, label: 'Edit Profile', subtitle: profile?.display_name || 'Set your name', editable: true, value: profile?.display_name || '' },
+        { icon: Link, label: 'IBAN', subtitle: profile?.custom_iban || 'Set your IBAN', editable: true, value: profile?.custom_iban || '' },
+        { icon: Link, label: 'API Endpoint', subtitle: profile?.api_endpoint_url || 'Not configured', editable: true, value: profile?.api_endpoint_url || '' },
       ],
     },
     {
       title: 'Preferences',
       items: [
-        { icon: Palette, label: 'Appearance', subtitle: 'Dark mode' },
-        { icon: Shield, label: 'Security', subtitle: '2FA, biometrics' },
+        { icon: Palette, label: 'Appearance', subtitle: 'Dark mode', editable: false, value: '' },
+        { icon: Shield, label: 'Security', subtitle: '2FA, biometrics', editable: false, value: '' },
       ],
     },
   ];
