@@ -154,6 +154,10 @@
     padding-bottom: max(env(safe-area-inset-bottom), 1rem);
   }
 
+  .safe-top {
+    padding-top: max(env(safe-area-inset-top), 1rem);
+  }
+
   .text-balance {
     text-wrap: balance;
   }
