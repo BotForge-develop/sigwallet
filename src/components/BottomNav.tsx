@@ -1,6 +1,7 @@
 import { Home, ArrowLeftRight, MessageCircle, User } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { hapticLight } from '@/lib/haptics';
 
 const tabs = [
   { icon: Home, label: 'Home', path: '/' },
