@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { User, Link, Palette, Shield, ChevronRight, LogOut, Plus } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { User, Link, Palette, Shield, ChevronRight, LogOut, Plus, Check, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useContacts } from '@/hooks/useContacts';
@@ -13,6 +13,25 @@ const Profile = () => {
   const [showAddContact, setShowAddContact] = useState(false);
   const [newName, setNewName] = useState('');
   const [newIban, setNewIban] = useState('');
+  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState('');
+
+  const startEdit = (field: string, currentValue: string) => {
+    setEditingField(field);
+    setEditValue(currentValue || '');
+  };
+
+  const saveEdit = async () => {
+    if (!editingField) return;
+    const key = editingField === 'Edit Profile' ? 'display_name'
+      : editingField === 'API Endpoint' ? 'api_endpoint_url'
+      : editingField === 'IBAN' ? 'custom_iban' : null;
+    if (!key) return;
+    const res = await updateProfile({ [key]: editValue.trim() || null });
+    if (res?.error) toast.error(res.error.message);
+    else toast.success('Gespeichert!');
+    setEditingField(null);
+  };
 
   const handleAddContact = async () => {
     if (!newName.trim()) return;
