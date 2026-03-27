@@ -24,7 +24,10 @@ const BottomNav = () => {
           return (
             <button
               key={tab.path}
-              onClick={() => navigate(tab.path)}
+              onClick={() => {
+                hapticLight();
+                navigate(tab.path);
+              }}
               className="flex flex-col items-center gap-0.5 relative px-4 py-1"
             >
               {isActive && (

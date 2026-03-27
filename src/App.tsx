@@ -33,6 +33,11 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   const { user, loading } = useAuth();
 
+  useEffect(() => {
+    if (user) {
+      initPushNotifications();
+    }
+  }, [user]);
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-2 border-beige border-t-transparent animate-spin" />
