@@ -11,6 +11,7 @@ import {
   saveCredentials,
   getCredentials,
 } from '@/lib/biometrics';
+import liquidGlassAfter from '@/assets/apple-liquid-glass-after.png';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -156,8 +157,21 @@ const Auth = () => {
   return (
     <div className="relative h-full overflow-hidden px-6" style={{ touchAction: 'manipulation', overscrollBehavior: 'none' }}>
       <div className="absolute inset-0 overflow-hidden">
+        <div className="pointer-events-none absolute inset-x-4 top-[max(env(safe-area-inset-top),1rem)] z-0 opacity-90">
+          <div className="glass-liquid rounded-[2rem] p-2">
+            <img
+              src={liquidGlassAfter}
+              alt="Apple Liquid Glass reference"
+              className="h-24 w-full rounded-[1.5rem] object-cover opacity-70"
+              loading="eager"
+            />
+          </div>
+        </div>
+
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-64 bg-gradient-to-b from-accent/10 via-transparent to-transparent" />
+
         <div
-          className="mx-auto flex h-full w-full max-w-sm flex-col"
+          className="relative z-10 mx-auto flex h-full w-full max-w-sm flex-col"
           style={{
             transform: `translate3d(0, -${keyboardOffset}px, 0)`,
             transition: 'transform 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
@@ -170,7 +184,7 @@ const Auth = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3 }}
           >
-            <div className="mt-12 text-center">
+            <div className="mt-36 text-center">
               <div className="w-16 h-16 rounded-2xl gradient-beige mx-auto mb-4 flex items-center justify-center">
                 <span className="text-2xl font-bold text-primary-foreground">S</span>
               </div>
