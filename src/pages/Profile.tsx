@@ -312,7 +312,7 @@ const Profile = () => {
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
                     />
-                    <button onClick={saveEdit} className="text-green-400"><Check size={16} /></button>
+                    <button onClick={saveEdit} className="text-beige"><Check size={16} /></button>
                     <button onClick={() => setEditingField(null)} className="text-muted-foreground"><X size={16} /></button>
                   </motion.div>
                 ) : (
