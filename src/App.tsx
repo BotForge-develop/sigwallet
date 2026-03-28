@@ -45,7 +45,8 @@ const AppRoutes = () => {
   );
 
   return (
-    <div className="max-w-md mx-auto relative min-h-[100dvh]">
+    <div className="fixed inset-0 overflow-hidden">
+    <div className="max-w-md mx-auto relative h-full overflow-y-auto overflow-x-hidden">
       <AnimatePresence mode="wait">
         <Routes>
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
@@ -59,6 +60,7 @@ const AppRoutes = () => {
         </Routes>
       </AnimatePresence>
       {user && <BottomNav />}
+    </div>
     </div>
   );
 };
