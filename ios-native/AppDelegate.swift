@@ -10,7 +10,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var bridgeVC: CAPBridgeViewController!
 
     private var routeObserverSetup = false
-    private var routePollTimer: Timer?
     private var lastKnownRoute = "/auth"
 
     func application(
@@ -39,8 +38,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         tabBarController.viewControllers = controllers
         tabBarController.delegate = self
 
+        // WICHTIG: Auf iOS 26+ KEINE Appearance setzen — Liquid Glass ist automatisch!
+        // Nur auf älteren iOS-Versionen ein custom Appearance verwenden.
         if #available(iOS 26.0, *) {
-            // Liquid Glass wird automatisch angewendet — KEINE Appearance setzen!
+            // Nichts tun — Liquid Glass wird automatisch angewendet
         } else {
             let appearance = UITabBarAppearance()
             appearance.configureWithDefaultBackground()
@@ -65,23 +66,21 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         tabBarController.view.insertSubview(bridgeVC.view, belowSubview: tabBarController.tabBar)
         bridgeVC.didMove(toParent: tabBarController)
 
-        startRouteSyncWhenReady()
+        waitForBridgeAndSetupRouting()
 
         return true
     }
 
-    private func startRouteSyncWhenReady() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-            guard let self = self else { return }
+    // MARK: - Route Sync (NUR über JavaScript — NICHT über webView.url!)
 
+    private func waitForBridgeAndSetupRouting() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self else { return }
             guard let webView = self.bridgeVC.bridge?.webView else {
-                self.startRouteSyncWhenReady()
+                self.waitForBridgeAndSetupRouting()
                 return
             }
-
             self.setupRouteObserver(webView: webView)
-            self.startRoutePolling(webView: webView)
-            self.applyRoute(self.readCurrentRoute(from: webView))
         }
     }
 
@@ -106,19 +105,22 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
           const origPushState = history.pushState;
           history.pushState = function() {
             origPushState.apply(this, arguments);
-            setTimeout(reportRoute, 0);
+            setTimeout(reportRoute, 50);
           };
 
           const origReplaceState = history.replaceState;
           history.replaceState = function() {
             origReplaceState.apply(this, arguments);
-            setTimeout(reportRoute, 0);
+            setTimeout(reportRoute, 50);
           };
 
           window.addEventListener("popstate", reportRoute);
           window.addEventListener("nativeRouteRefresh", reportRoute);
 
-          reportRoute();
+          // Initial report nach kurzer Verzögerung (warten bis React Router geladen)
+          setTimeout(reportRoute, 300);
+          setTimeout(reportRoute, 1000);
+          setTimeout(reportRoute, 2000);
         })();
         """
 
@@ -127,51 +129,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    private func startRoutePolling(webView: WKWebView) {
-        routePollTimer?.invalidate()
-
-        routePollTimer = Timer.scheduledTimer(withTimeInterval: 0.35, repeats: true) { [weak self, weak webView] _ in
-            guard let self = self, let webView = webView else { return }
-            let route = self.readCurrentRoute(from: webView)
-            self.applyRoute(route)
-        }
-    }
-
-    private func readCurrentRoute(from webView: WKWebView) -> String {
-        if let url = webView.url {
-            let path = url.path.isEmpty ? "/" : url.path
-            return path
-        }
-        return lastKnownRoute
-    }
+    // MARK: - Route anwenden
 
     private func applyRoute(_ route: String) {
         let normalizedRoute = route.isEmpty ? "/" : route
-        guard normalizedRoute != lastKnownRoute || tabBarController.tabBar.isHidden else {
-            if normalizedRoute == "/auth" || normalizedRoute.hasPrefix("/auth") {
-                updateLayout(tabBarHidden: true)
-            }
-            return
-        }
 
+        // Nur updaten wenn sich die Route tatsächlich geändert hat
+        guard normalizedRoute != lastKnownRoute else { return }
         lastKnownRoute = normalizedRoute
 
         let isAuth = normalizedRoute == "/auth" || normalizedRoute.hasPrefix("/auth")
 
-        UIView.animate(withDuration: 0.2) {
+        UIView.animate(withDuration: 0.25) {
             self.updateLayout(tabBarHidden: isAuth)
         }
 
         guard !isAuth else { return }
 
         let tabRoutes = ["/", "/transfer", "/chat", "/profile"]
-
         for (index, tabRoute) in tabRoutes.enumerated() {
             if tabRoute == "/" && normalizedRoute == "/" {
                 tabBarController.selectedIndex = index
                 return
             }
-
             if tabRoute != "/" && normalizedRoute.hasPrefix(tabRoute) {
                 tabBarController.selectedIndex = index
                 return
@@ -185,24 +165,25 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         guard let webView = bridgeVC.bridge?.webView else { return }
 
         let bottomInset: CGFloat = tabBarHidden ? 0 : tabBarController.tabBar.frame.height
-
         webView.scrollView.contentInset.bottom = bottomInset
         webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomInset
-        webView.scrollView.scrollIndicatorInsets.bottom = bottomInset
     }
+
+    // MARK: - App Lifecycle
 
     func applicationWillResignActive(_ application: UIApplication) {}
     func applicationDidEnterBackground(_ application: UIApplication) {}
     func applicationWillEnterForeground(_ application: UIApplication) {}
+
     func applicationDidBecomeActive(_ application: UIApplication) {
+        // Route nochmal abfragen wenn App wieder aktiv wird
         bridgeVC.bridge?.webView?.evaluateJavaScript(
             "window.dispatchEvent(new Event('nativeRouteRefresh'));",
             completionHandler: nil
         )
     }
-    func applicationWillTerminate(_ application: UIApplication) {
-        routePollTimer?.invalidate()
-    }
+
+    func applicationWillTerminate(_ application: UIApplication) {}
 
     func application(
         _ app: UIApplication,
@@ -225,6 +206,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 }
 
+// MARK: - Tab Bar Delegate
+
 extension AppDelegate: UITabBarControllerDelegate {
     func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
         let routes = ["/", "/transfer", "/chat", "/profile"]
@@ -236,10 +219,12 @@ extension AppDelegate: UITabBarControllerDelegate {
         """, completionHandler: nil)
 
         tabBarController.selectedIndex = index
-        applyRoute(route)
+        lastKnownRoute = route
         return false
     }
 }
+
+// MARK: - JS Message Handler (einzige Route-Quelle!)
 
 extension AppDelegate: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
