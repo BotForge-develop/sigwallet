@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { initPushNotifications } from "@/lib/pushNotifications";
@@ -32,12 +32,24 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppRoutes = () => {
   const { user, loading } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (user) {
       initPushNotifications();
     }
   }, [user]);
+
+  // Listen for native iOS tab bar taps
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const route = (e as CustomEvent).detail;
+      if (route) navigate(route);
+    };
+    window.addEventListener('nativeTabChange', handler);
+    return () => window.removeEventListener('nativeTabChange', handler);
+  }, [navigate]);
+
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
       <div className="w-8 h-8 rounded-full border-2 border-beige border-t-transparent animate-spin" />
