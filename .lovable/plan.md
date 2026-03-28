@@ -1,83 +1,83 @@
 
-Goal: make the auth screen feel anchored on iPhone so opening the keyboard does not cause the whole page to “jump” or become finger-draggable.
+Goal: get both native iOS features working reliably: Face ID and the native Apple-style tab bar.
 
 What I found
-- The current auth screen still changes layout when the keyboard opens:
-  - `src/pages/Auth.tsx` toggles `keyboardVisible` and changes spacing/scale (`mb-6 scale-90 opacity-90` vs `mb-12 mt-auto`).
-  - The page uses a flex column with `mt-auto` / `mb-auto`, so when the keyboard state changes the whole composition reflows.
-- The app shell is only `relative min-h-[100dvh]` in `src/App.tsx`, not locked to the physical viewport.
-- `src/index.css` sets `min-height: 100%` on `html, body, #root`, which still allows viewport resizing/elastic behavior instead of fully pinning the app.
-- Capacitor keyboard config is already set to no native resize, so the remaining issue is mostly web layout strategy, not plugin setup.
+- The web app side is already prepared for a native tab bar:
+  - `src/components/BottomNav.tsx` hides the web tab bar on iOS.
+  - `src/App.tsx` sends route changes to native via `window.webkit.messageHandlers.routeChange`.
+- The current blocker is very likely in the local Xcode project, not in the Lovable preview.
+- I also found a strong Face ID root cause: your app uses Capacitor 8, but the installed biometric package in `package.json` is `capacitor-native-biometric@4.2.2`, and its npm README says it only supports Capacitor 3 and 4. That makes it a likely reason why Face ID never appears on iOS.
+- I could not inspect the native iOS files directly because there is no `ios/` folder in this repo snapshot, so the Liquid Glass issue is almost certainly inside your local Xcode project files.
 
 Implementation plan
-1. Lock the app shell to a fixed viewport
-- Update the top-level app container in `src/App.tsx` to use a fixed, non-scrolling frame (`fixed inset-0`, width cap, overflow hidden).
-- Center the phone-sized app inside that fixed frame so the webview itself does not visually move.
 
-2. Replace the auth page’s flex-reflow layout with an anchored layout
-- Refactor `src/pages/Auth.tsx` from “content pushed by auto margins” to a fixed three-zone structure:
-  - top brand/header area
-  - middle form area
-  - bottom spacer/safe-area area
-- Keep the form anchored vertically with explicit top padding instead of `mt-auto`/`mb-auto`.
-- Remove the layout-changing logo shrink/reflow as the primary keyboard response.
+1. Fix the biometric dependency mismatch
+- Replace `capacitor-native-biometric` with a Capacitor-8-compatible biometric plugin.
+- Update `src/lib/biometrics.ts` imports and method calls to the new plugin API.
+- Keep the current account-bound behavior:
+  - save credentials per email
+  - only offer Face ID for the same account
+  - show the Face ID prompt right after successful manual login
 
-3. Handle keyboard with a transform, not reflow
-- Keep the page height constant.
-- When the keyboard opens, move only the auth content wrapper slightly upward with `transform: translateY(...)` and a smooth transition.
-- Use a bounded offset so it feels stable and always returns to the exact same resting point.
-- Prefer reading keyboard height from the Capacitor keyboard event if available, rather than a simple boolean.
+2. Harden the auth flow for native iOS
+- Keep the existing “manual login first, then ask to enable Face ID” pattern in `src/pages/Auth.tsx`.
+- Add clearer failure handling so the app can distinguish:
+  - plugin unavailable
+  - permission missing
+  - biometric enrollment missing
+  - user canceled
+- Ensure the login page only auto-attempts biometrics when credentials actually exist for that account.
 
-4. Prevent manual dragging / rubber-band feel inside the auth screen
-- Add stricter non-scroll behavior on the auth route container:
-  - `overflow-hidden`
-  - `touch-action: manipulation` or equivalent safe mobile behavior
-  - optional `overscroll-behavior-y: none` on root app containers
-- Update `html, body, #root` in `src/index.css` to use full fixed height (`height: 100%` / `100dvh`) rather than only `min-height`.
+3. Fix the native tab bar ownership in Xcode
+- Ensure the native app lifecycle is fully controlled by `AppDelegate`.
+- Remove any storyboard/scene-based startup that can override the programmatic `UITabBarController`.
+- Verify the native bar is created as the real root view controller and not covered by another controller.
+- Avoid aggressive custom `UITabBarAppearance` styling on newer iOS, because that can suppress the Apple glass effect.
 
-5. Keep inputs usable without moving the whole app
-- Ensure the form section has enough reserved vertical space so email/password fields stay visible above the keyboard.
-- If needed, reduce only decorative spacing on keyboard open, not structural layout.
-- Keep the submit button reachable without introducing page scroll.
+4. Fix required iOS permissions/config
+- Add `NSFaceIDUsageDescription` in `Info.plist`.
+- Verify the biometric plugin is actually linked into the iOS app target.
+- Check raw Info.plist keys, not just the friendly names in Xcode.
 
-6. Native-focused QA after implementation
-- Test specifically on iPhone build:
-  - tap email
-  - tap password
-  - switch between fields
-  - dismiss keyboard
-  - rotate if relevant
-- Verify there is no:
-  - whole-screen jump
-  - draggable offset after keyboard opens
-  - stuck translated state after keyboard closes
+5. End-to-end native validation
+- Test this exact sequence on a real iPhone:
+  1. cold launch app
+  2. sign in manually
+  3. get “Enable Face ID?” prompt
+  4. enable Face ID
+  5. background/close app
+  6. reopen app
+  7. Face ID login appears
+  8. native tab bar is visible after login and hidden on `/auth`
 
-Files to update
+Exact files I would update
+- `package.json`
+- `src/lib/biometrics.ts`
 - `src/pages/Auth.tsx`
-- `src/App.tsx`
-- `src/index.css`
-
-Expected result
-- The auth screen will have one fixed resting position.
-- Opening the keyboard will no longer re-layout the whole page.
-- At most, the centered auth block will glide upward slightly, then return exactly to the same point when the keyboard closes.
-- The screen should no longer feel like it can be manually “rearranged” after keyboard interaction.
+- possibly `src/contexts/AuthContext.tsx` for better biometric unlock behavior
+- local native iOS files in Xcode:
+  - `ios/App/App/Info.plist`
+  - `ios/App/App/AppDelegate.swift`
+  - remove or neutralize `SceneDelegate.swift`
+  - remove `Main.storyboard` startup usage
 
 Technical details
-```text
-Current issue:
-[viewport]
-  [auth flex layout with auto margins]
-  -> keyboardVisible toggles classes
-  -> layout recalculates
-  -> content appears to jump/drift
+- Evidence for Face ID root cause:
+  - `package.json` shows Capacitor 8 packages
+  - `package.json` also shows `capacitor-native-biometric@4.2.2`
+  - npm docs for that package explicitly say “Only supports Capacitor 3 and 4”
+- Evidence web side is ready:
+  - `BottomNav.tsx` already hides the web bar on iOS
+  - `App.tsx` already posts route changes to native
+- Therefore:
+  - Face ID failure is likely plugin compatibility + missing iOS permission/linking
+  - Liquid Glass failure is likely local Xcode scene/storyboard/root-controller setup
 
-Planned behavior:
-[fixed app frame]
-  [anchored auth wrapper]
-    [header]
-    [form]
-  -> keyboard event updates offset only
-  -> transformY(-N px)
-  -> no document/page reflow
-```
+Most likely final diagnosis
+- Face ID is failing because the biometric plugin is outdated/incompatible with Capacitor 8.
+- Liquid Glass is failing because the local iOS app is not actually booting through the custom native tab bar controller anymore, or its appearance is being overridden.
+
+If you approve, my next implementation pass will focus on:
+1. replacing the biometric plugin with a Capacitor-8-compatible one
+2. adapting the auth code to it
+3. giving you a precise Xcode-native checklist for the local files that must match the web code
