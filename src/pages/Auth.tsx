@@ -10,6 +10,7 @@ import {
   isBiometricEnabled,
   saveCredentials,
   getCredentials,
+  getBiometricAccount,
 } from '@/lib/biometrics';
 
 const Auth = () => {
@@ -42,6 +43,7 @@ const Auth = () => {
     try {
       const creds = await getCredentials();
       if (creds) {
+        setEmail(creds.username);
         const { error } = await supabase.auth.signInWithPassword({
           email: creds.username,
           password: creds.password,
@@ -112,7 +114,7 @@ const Auth = () => {
 
         // After successful login, check if we should offer biometric setup
         const available = await isBiometricAvailable();
-        if (available && !isBiometricEnabled()) {
+        if (available && !isBiometricEnabled(email)) {
           setPendingCreds({ email, password });
           setShowEnableBiometric(true);
           setLoading(false);
@@ -294,7 +296,7 @@ const Auth = () => {
                       disabled={loading}
                     >
                       <ScanFace size={20} className="text-beige" />
-                      Mit Face ID anmelden
+                      Mit Face ID anmelden{getBiometricAccount() ? ` (${getBiometricAccount()})` : ''}
                     </motion.button>
                   )}
 
