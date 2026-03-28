@@ -38,6 +38,12 @@ const AppRoutes = () => {
     if (user) {
       initPushNotifications();
     }
+    // Notify native iOS layer about route visibility (tab bar show/hide)
+    try {
+      (window as any).webkit?.messageHandlers?.routeChange?.postMessage(
+        user ? window.location.pathname : '/auth'
+      );
+    } catch {}
   }, [user]);
 
   // Listen for native iOS tab bar taps
@@ -49,6 +55,15 @@ const AppRoutes = () => {
     window.addEventListener('nativeTabChange', handler);
     return () => window.removeEventListener('nativeTabChange', handler);
   }, [navigate]);
+
+  // Report route changes to native layer
+  useEffect(() => {
+    try {
+      (window as any).webkit?.messageHandlers?.routeChange?.postMessage(
+        window.location.pathname
+      );
+    } catch {}
+  });
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
