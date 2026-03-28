@@ -2,6 +2,79 @@ import UIKit
 import Capacitor
 import WebKit
 
+// MARK: - Liquid Glass Tab Bar Setup
+
+struct LiquidGlassTabBarSetup {
+
+    struct TabDef {
+        let title: String
+        let systemImage: String
+        let route: String
+    }
+
+    static let tabs: [TabDef] = [
+        TabDef(title: "Home", systemImage: "house.fill", route: "/"),
+        TabDef(title: "Transfer", systemImage: "arrow.left.arrow.right", route: "/transfer"),
+        TabDef(title: "Chat", systemImage: "message.fill", route: "/chat"),
+        TabDef(title: "Profile", systemImage: "person.fill", route: "/profile"),
+    ]
+
+    static func configure(tabBarController: UITabBarController) {
+        var controllers: [UIViewController] = []
+
+        for (index, tab) in tabs.enumerated() {
+            let vc = UIViewController()
+            vc.view.backgroundColor = .clear
+            vc.tabBarItem = UITabBarItem(title: tab.title, image: UIImage(systemName: tab.systemImage), tag: index)
+            controllers.append(vc)
+        }
+
+        tabBarController.viewControllers = controllers
+
+        if #available(iOS 26.0, *) {
+            // Use the new UITab API required for Liquid Glass
+            var tabObjects: [UITab] = []
+            for (index, tab) in tabs.enumerated() {
+                let uiTab = UITab(
+                    title: tab.title,
+                    image: UIImage(systemName: tab.systemImage),
+                    identifier: tab.route
+                ) { _ in
+                    controllers[index]
+                }
+                tabObjects.append(uiTab)
+            }
+            tabBarController.tabs = tabObjects
+            // Do NOT set any appearance — Liquid Glass is automatic on iOS 26
+        } else {
+            let appearance = UITabBarAppearance()
+            appearance.configureWithDefaultBackground()
+            appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
+            appearance.backgroundColor = UIColor.clear
+            appearance.shadowColor = UIColor.clear
+            tabBarController.tabBar.standardAppearance = appearance
+            tabBarController.tabBar.scrollEdgeAppearance = appearance
+            tabBarController.tabBar.tintColor = UIColor(red: 0.93, green: 0.91, blue: 0.78, alpha: 1.0)
+            tabBarController.tabBar.unselectedItemTintColor = UIColor.secondaryLabel
+        }
+    }
+
+    static func route(for index: Int) -> String {
+        guard index >= 0 && index < tabs.count else { return "/" }
+        return tabs[index].route
+    }
+
+    static func tabIndex(for route: String) -> Int? {
+        for (index, tab) in tabs.enumerated() {
+            if tab.route == "/" && route == "/" { return index }
+            if tab.route != "/" && route.hasPrefix(tab.route) { return index }
+        }
+        return nil
+    }
+}
+
+// MARK: - App Delegate
+
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
@@ -20,17 +93,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         bridgeVC = CAPBridgeViewController()
         tabBarController = UITabBarController()
 
-        // Use the LiquidGlassTabBar setup (iOS 26 UITab API + fallback)
         LiquidGlassTabBarSetup.configure(tabBarController: tabBarController)
 
         tabBarController.delegate = self
-        tabBarController.tabBar.isHidden = true // Hidden until user logs in
+        tabBarController.tabBar.isHidden = true
 
         window = UIWindow(frame: UIScreen.main.bounds)
         window?.rootViewController = tabBarController
         window?.makeKeyAndVisible()
 
-        // Add Capacitor WebView below the tab bar
         tabBarController.addChild(bridgeVC)
         bridgeVC.view.frame = tabBarController.view.bounds
         bridgeVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -103,7 +174,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     private func applyRoute(_ route: String) {
         let normalizedRoute = route.isEmpty ? "/" : route
-
         guard normalizedRoute != lastKnownRoute else { return }
         lastKnownRoute = normalizedRoute
 
@@ -122,9 +192,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     private func updateLayout(tabBarHidden: Bool) {
         tabBarController.tabBar.isHidden = tabBarHidden
-
         guard let webView = bridgeVC.bridge?.webView else { return }
-
         let bottomInset: CGFloat = tabBarHidden ? 0 : tabBarController.tabBar.frame.height
         webView.scrollView.contentInset.bottom = bottomInset
         webView.scrollView.verticalScrollIndicatorInsets.bottom = bottomInset
@@ -188,7 +256,6 @@ extension AppDelegate: UITabBarControllerDelegate {
 extension AppDelegate: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == "routeChange", let route = message.body as? String else { return }
-
         DispatchQueue.main.async { [weak self] in
             self?.applyRoute(route)
         }
