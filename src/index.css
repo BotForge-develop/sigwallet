@@ -42,11 +42,6 @@
     --glass: 0 0% 100% / 0.05;
     --glass-border: 0 0% 100% / 0.08;
     --glass-strong: 0 0% 100% / 0.1;
-    --liquid-surface-start: 210 34% 14% / 0.7;
-    --liquid-surface-mid: 220 24% 10% / 0.5;
-    --liquid-surface-end: 210 18% 8% / 0.82;
-    --liquid-highlight: 190 100% 92% / 0.18;
-    --liquid-shadow: 215 75% 30% / 0.14;
 
     --sidebar-background: 0 0% 4%;
     --sidebar-foreground: 0 0% 80%;
@@ -163,21 +158,6 @@
 
   .gradient-beige {
     background: linear-gradient(135deg, hsl(60 56% 91%), hsl(40 40% 78%));
-  }
-
-  .bg-liquid-surface {
-    background:
-      radial-gradient(circle at 22% 18%, hsl(var(--liquid-highlight)), transparent 28%),
-      radial-gradient(circle at 76% 72%, hsl(var(--liquid-shadow)), transparent 32%),
-      linear-gradient(145deg, hsl(var(--liquid-surface-start)), hsl(var(--liquid-surface-mid)) 48%, hsl(var(--liquid-surface-end)));
-  }
-
-  .bg-liquid-highlight {
-    background: hsl(var(--liquid-highlight));
-  }
-
-  .bg-liquid-shadow {
-    background: hsl(var(--liquid-shadow));
   }
 
   .metallic-sheen {
