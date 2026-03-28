@@ -1,16 +1,18 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Link, Palette, Shield, ChevronRight, LogOut, Plus, Check, X, ScanFace } from 'lucide-react';
+import { User, Link, Shield, ChevronRight, LogOut, Plus, Check, X, ScanFace, Bell, Globe } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useContacts } from '@/hooks/useContacts';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
+import { Switch } from '@/components/ui/switch';
 import {
   deleteCredentials,
   isBiometricAvailable,
   isBiometricEnabled,
+  promptBiometricEnrollment,
   saveCredentials,
 } from '@/lib/biometrics';
 
@@ -28,6 +30,8 @@ const Profile = () => {
   const [biometricSaving, setBiometricSaving] = useState(false);
   const biometricSupported = useMemo(() => Capacitor.getPlatform() === 'ios', []);
   const biometricActive = biometricSupported && isBiometricEnabled();
+  const [darkMode] = useState(true);
+  const [notifications] = useState(true);
 
   const startEdit = (field: string, currentValue: string) => {
     setEditingField(field);
@@ -36,7 +40,7 @@ const Profile = () => {
 
   const saveEdit = async () => {
     if (!editingField) return;
-    const key = editingField === 'Edit Profile' ? 'display_name'
+    const key = editingField === 'Name' ? 'display_name'
       : editingField === 'API Endpoint' ? 'api_endpoint_url'
       : editingField === 'IBAN' ? 'custom_iban' : null;
     if (!key) return;
@@ -51,45 +55,51 @@ const Profile = () => {
     const initials = newName.trim().slice(0, 2).toUpperCase();
     const { error } = await addContact({ name: newName.trim(), initials, iban: newIban || undefined }) || {};
     if (error) { toast.error(error.message); return; }
-    toast.success(`${newName} added!`);
+    toast.success(`${newName} hinzugefügt!`);
     setNewName('');
     setNewIban('');
     setShowAddContact(false);
   };
 
-  const handleOpenBiometricSetup = async () => {
-    const available = await isBiometricAvailable();
-    if (!available) {
-      toast.error('Face ID ist auf diesem Gerät aktuell nicht verfügbar.');
-      return;
+  const handleToggleBiometric = async (enabled: boolean) => {
+    if (enabled) {
+      const available = await isBiometricAvailable();
+      if (!available) {
+        toast.error('Face ID ist auf diesem Gerät nicht verfügbar.');
+        return;
+      }
+      setShowBiometricSetup(true);
+    } else {
+      await deleteCredentials();
+      setShowBiometricSetup(false);
+      setBiometricPassword('');
+      toast.success('Face ID deaktiviert.');
     }
-    setShowBiometricSetup(true);
   };
 
   const handleEnableBiometric = async () => {
-    if (!user?.email) {
-      toast.error('Keine E-Mail für diesen Account gefunden.');
-      return;
-    }
-
-    if (!biometricPassword.trim()) {
-      toast.error('Bitte gib dein Passwort ein.');
+    if (!user?.email || !biometricPassword.trim()) {
+      toast.error('Bitte Passwort eingeben.');
       return;
     }
 
     setBiometricSaving(true);
     try {
+      // Verify password first
       const { error } = await supabase.auth.signInWithPassword({
         email: user.email,
         password: biometricPassword,
       });
-
       if (error) throw error;
 
+      // Prompt Face ID enrollment
+      await promptBiometricEnrollment();
+
+      // Save credentials for future biometric login
       await saveCredentials(user.email, biometricPassword);
       setShowBiometricSetup(false);
       setBiometricPassword('');
-      toast.success('Face ID ist jetzt aktiviert.');
+      toast.success('Face ID aktiviert!');
     } catch (error: any) {
       toast.error(error.message || 'Face ID konnte nicht aktiviert werden.');
     } finally {
@@ -97,105 +107,214 @@ const Profile = () => {
     }
   };
 
-  const handleDisableBiometric = async () => {
-    await deleteCredentials();
-    setShowBiometricSetup(false);
-    setBiometricPassword('');
-    toast.success('Face ID wurde deaktiviert.');
-  };
-
-  const settingsGroups = [
-    {
-      title: 'Account',
-      items: [
-        { icon: User, label: 'Edit Profile', subtitle: profile?.display_name || 'Set your name', editable: true, value: profile?.display_name || '' },
-        { icon: Link, label: 'IBAN', subtitle: profile?.custom_iban || 'Set your IBAN', editable: true, value: profile?.custom_iban || '' },
-        { icon: Link, label: 'API Endpoint', subtitle: profile?.api_endpoint_url || 'Not configured', editable: true, value: profile?.api_endpoint_url || '' },
-      ],
-    },
-    {
-      title: 'Preferences',
-      items: [
-        { icon: Palette, label: 'Appearance', subtitle: 'Dark mode', editable: false, value: '' },
-        { icon: Shield, label: 'Security', subtitle: '2FA, biometrics', editable: false, value: '' },
-      ],
-    },
+  const editableFields = [
+    { key: 'Name', value: profile?.display_name || '', icon: User },
+    { key: 'IBAN', value: profile?.custom_iban || '', icon: Link },
+    { key: 'API Endpoint', value: profile?.api_endpoint_url || '', icon: Globe },
   ];
 
   return (
     <motion.div
-      className="min-h-screen pb-24 px-5 pt-14"
+      className="min-h-screen pb-24 px-4 pt-14"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
     >
-      {/* Profile header */}
+      {/* Profile Header - Compact */}
       <motion.div
-        className="flex flex-col items-center mb-8"
-        initial={{ y: 20, opacity: 0 }}
+        className="flex items-center gap-4 mb-6"
+        initial={{ y: 10, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+      >
+        <div className="w-14 h-14 rounded-2xl gradient-beige flex items-center justify-center text-xl font-bold text-primary-foreground">
+          {profile?.display_name?.charAt(0)?.toUpperCase() || 'U'}
+        </div>
+        <div className="flex-1">
+          <h1 className="text-lg font-semibold text-foreground">{profile?.display_name || 'User'}</h1>
+          <p className="text-xs text-muted-foreground">{user?.email}</p>
+        </div>
+      </motion.div>
+
+      {/* Account Settings - Compact list */}
+      <motion.div
+        className="mb-4"
+        initial={{ y: 10, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.05 }}
+      >
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1.5 px-1">Konto</p>
+        <div className="glass rounded-2xl divide-y divide-border">
+          {editableFields.map((field) => (
+            <div key={field.key}>
+              {editingField === field.key ? (
+                <div className="flex items-center gap-2.5 p-3">
+                  <field.icon size={14} className="text-muted-foreground shrink-0" />
+                  <input
+                    autoFocus
+                    className="flex-1 bg-transparent text-sm text-foreground outline-none border-b border-beige/50 pb-0.5"
+                    placeholder={field.key}
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
+                  />
+                  <button onClick={saveEdit} className="text-beige"><Check size={14} /></button>
+                  <button onClick={() => setEditingField(null)} className="text-muted-foreground"><X size={14} /></button>
+                </div>
+              ) : (
+                <button
+                  className="w-full flex items-center gap-2.5 p-3 text-left"
+                  onClick={() => startEdit(field.key, field.value)}
+                >
+                  <field.icon size={14} className="text-muted-foreground shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground">{field.key}</p>
+                    <p className="text-sm text-foreground truncate">{field.value || '—'}</p>
+                  </div>
+                  <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Security & Preferences - Switches */}
+      <motion.div
+        className="mb-4"
+        initial={{ y: 10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.1 }}
       >
-        <div className="w-20 h-20 rounded-full gradient-beige flex items-center justify-center text-2xl font-bold text-primary-foreground mb-3">
-          {profile?.display_name?.charAt(0)?.toUpperCase() || 'U'}
+        <p className="text-[10px] text-muted-foreground uppercase tracking-widest mb-1.5 px-1">Einstellungen</p>
+        <div className="glass rounded-2xl divide-y divide-border">
+          {biometricSupported && (
+            <div className="flex items-center gap-2.5 p-3">
+              <ScanFace size={14} className="text-muted-foreground shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm text-foreground">Face ID</p>
+                <p className="text-[10px] text-muted-foreground">Schneller Login</p>
+              </div>
+              <Switch
+                checked={biometricActive}
+                onCheckedChange={handleToggleBiometric}
+              />
+            </div>
+          )}
+          <div className="flex items-center gap-2.5 p-3">
+            <Bell size={14} className="text-muted-foreground shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-foreground">Push-Benachrichtigungen</p>
+              <p className="text-[10px] text-muted-foreground">Transaktions-Alerts</p>
+            </div>
+            <Switch checked={notifications} disabled />
+          </div>
+          <div className="flex items-center gap-2.5 p-3">
+            <Shield size={14} className="text-muted-foreground shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-foreground">Dark Mode</p>
+              <p className="text-[10px] text-muted-foreground">Immer aktiv</p>
+            </div>
+            <Switch checked={darkMode} disabled />
+          </div>
         </div>
-        <h1 className="text-xl font-semibold text-foreground">{profile?.display_name || 'User'}</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">{profile?.custom_iban || 'No IBAN set'}</p>
       </motion.div>
 
-      {/* Contacts section */}
+      {/* Biometric Password Setup Drawer */}
+      <AnimatePresence>
+        {showBiometricSetup && !biometricActive && (
+          <motion.div
+            className="mb-4 glass rounded-2xl p-4 space-y-3"
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+          >
+            <p className="text-xs text-muted-foreground">
+              Gib dein Passwort ein um Face ID zu aktivieren.
+            </p>
+            <input
+              type="password"
+              className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none glass rounded-xl px-3 h-10"
+              placeholder="Passwort"
+              value={biometricPassword}
+              onChange={(e) => setBiometricPassword(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleEnableBiometric()}
+            />
+            <div className="flex gap-2">
+              <motion.button
+                className="flex-1 h-10 rounded-xl gradient-beige text-primary-foreground font-semibold text-sm"
+                whileTap={{ scale: 0.97 }}
+                onClick={handleEnableBiometric}
+                disabled={biometricSaving}
+              >
+                {biometricSaving ? 'Aktiviere…' : 'Aktivieren'}
+              </motion.button>
+              <button
+                className="h-10 px-3 rounded-xl glass text-sm text-muted-foreground"
+                onClick={() => { setShowBiometricSetup(false); setBiometricPassword(''); }}
+              >
+                Abbrechen
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Contacts - Compact */}
       <motion.div
-        className="mb-6"
-        initial={{ y: 20, opacity: 0 }}
+        className="mb-4"
+        initial={{ y: 10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.15 }}
       >
-        <div className="flex items-center justify-between mb-2 px-1">
-          <p className="text-xs text-muted-foreground uppercase tracking-widest">Contacts ({contacts.length})</p>
+        <div className="flex items-center justify-between mb-1.5 px-1">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Kontakte ({contacts.length})</p>
           <button onClick={() => setShowAddContact(!showAddContact)} className="text-beige">
-            <Plus size={16} />
+            <Plus size={14} />
           </button>
         </div>
 
-        {showAddContact && (
-          <motion.div
-            className="glass rounded-2xl p-4 mb-3 space-y-3"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-          >
-            <input
-              className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none glass rounded-xl px-4 h-10"
-              placeholder="Name"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-            />
-            <input
-              className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none glass rounded-xl px-4 h-10"
-              placeholder="IBAN (optional)"
-              value={newIban}
-              onChange={(e) => setNewIban(e.target.value)}
-            />
-            <motion.button
-              className="w-full h-10 rounded-xl gradient-beige text-primary-foreground font-semibold text-sm"
-              whileTap={{ scale: 0.97 }}
-              onClick={handleAddContact}
+        <AnimatePresence>
+          {showAddContact && (
+            <motion.div
+              className="glass rounded-2xl p-3 mb-2 space-y-2"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
             >
-              Add Contact
-            </motion.button>
-          </motion.div>
-        )}
+              <input
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none glass rounded-xl px-3 h-9"
+                placeholder="Name"
+                value={newName}
+                onChange={(e) => setNewName(e.target.value)}
+              />
+              <input
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none glass rounded-xl px-3 h-9"
+                placeholder="IBAN (optional)"
+                value={newIban}
+                onChange={(e) => setNewIban(e.target.value)}
+              />
+              <motion.button
+                className="w-full h-9 rounded-xl gradient-beige text-primary-foreground font-semibold text-sm"
+                whileTap={{ scale: 0.97 }}
+                onClick={handleAddContact}
+              >
+                Hinzufügen
+              </motion.button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <div className="glass rounded-2xl divide-y divide-border">
           {contacts.length === 0 ? (
-            <div className="p-4 text-center text-muted-foreground text-sm">No contacts yet</div>
+            <div className="p-3 text-center text-muted-foreground text-xs">Noch keine Kontakte</div>
           ) : (
             contacts.map((c) => (
-              <div key={c.id} className="flex items-center gap-3 p-3">
-                <div className="w-9 h-9 rounded-full gradient-beige flex items-center justify-center text-xs font-semibold text-primary-foreground flex-shrink-0">
+              <div key={c.id} className="flex items-center gap-2.5 p-2.5">
+                <div className="w-8 h-8 rounded-full gradient-beige flex items-center justify-center text-[10px] font-semibold text-primary-foreground shrink-0">
                   {c.initials}
                 </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">{c.name}</p>
-                  {c.iban && <p className="text-xs text-muted-foreground">{c.iban}</p>}
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{c.name}</p>
+                  {c.iban && <p className="text-[10px] text-muted-foreground truncate">{c.iban}</p>}
                 </div>
               </div>
             ))
@@ -203,150 +322,17 @@ const Profile = () => {
         </div>
       </motion.div>
 
-      {biometricSupported && (
-        <motion.div
-          className="mb-6"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.18 }}
-        >
-          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2 px-1">
-            Security
-          </p>
-          <div className="glass rounded-2xl overflow-hidden">
-            <button
-              type="button"
-              className="w-full flex items-center gap-3 p-4 text-left"
-              onClick={biometricActive ? handleDisableBiometric : handleOpenBiometricSetup}
-            >
-              <div className="w-9 h-9 rounded-xl glass flex items-center justify-center flex-shrink-0">
-                <ScanFace size={16} className="text-muted-foreground" />
-              </div>
-              <div className="flex-1">
-                <p className="text-sm font-medium text-foreground">Face ID</p>
-                <p className="text-xs text-muted-foreground">
-                  {biometricActive ? 'Aktiviert für schnellen Login' : 'Aktiviere Login ohne Passwort-Eingabe'}
-                </p>
-              </div>
-              <span className="text-xs font-medium text-beige">
-                {biometricActive ? 'An' : 'Aus'}
-              </span>
-            </button>
-
-            <AnimatePresence initial={false}>
-              {showBiometricSetup && !biometricActive && (
-                <motion.div
-                  initial={{ height: 0, opacity: 0 }}
-                  animate={{ height: 'auto', opacity: 1 }}
-                  exit={{ height: 0, opacity: 0 }}
-                  className="border-t border-border"
-                >
-                  <div className="p-4 space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Gib einmal dein Passwort ein, damit Face ID sicher für diesen Account gespeichert wird.
-                    </p>
-                    <input
-                      type="password"
-                      className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none glass rounded-xl px-4 h-11"
-                      placeholder="Passwort bestätigen"
-                      value={biometricPassword}
-                      onChange={(e) => setBiometricPassword(e.target.value)}
-                    />
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        className="flex-1 h-11 rounded-xl gradient-beige text-primary-foreground font-semibold text-sm"
-                        onClick={handleEnableBiometric}
-                        disabled={biometricSaving}
-                      >
-                        {biometricSaving ? 'Aktiviere…' : 'Face ID aktivieren'}
-                      </button>
-                      <button
-                        type="button"
-                        className="h-11 px-4 rounded-xl glass text-sm text-foreground"
-                        onClick={() => {
-                          setShowBiometricSetup(false);
-                          setBiometricPassword('');
-                        }}
-                      >
-                        Abbrechen
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Settings */}
-      {settingsGroups.map((group, gi) => (
-        <motion.div
-          key={group.title}
-          className="mb-6"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.2 + gi * 0.1 }}
-        >
-          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2 px-1">
-            {group.title}
-          </p>
-          <div className="glass rounded-2xl divide-y divide-border">
-            {group.items.map((item) => (
-              <div key={item.label}>
-                {editingField === item.label ? (
-                  <motion.div
-                    className="flex items-center gap-3 p-4"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  >
-                    <div className="w-9 h-9 rounded-xl glass flex items-center justify-center flex-shrink-0">
-                      <item.icon size={16} className="text-muted-foreground" />
-                    </div>
-                    <input
-                      autoFocus
-                      className="flex-1 bg-transparent text-sm text-foreground outline-none border-b border-beige pb-1"
-                      placeholder={item.label === 'Edit Profile' ? 'Display Name' : item.label}
-                      value={editValue}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
-                    />
-                    <button onClick={saveEdit} className="text-beige"><Check size={16} /></button>
-                    <button onClick={() => setEditingField(null)} className="text-muted-foreground"><X size={16} /></button>
-                  </motion.div>
-                ) : (
-                  <button
-                    className="w-full flex items-center gap-3 p-4 text-left"
-                    onClick={() => item.editable && startEdit(item.label, item.value)}
-                  >
-                    <div className="w-9 h-9 rounded-xl glass flex items-center justify-center flex-shrink-0">
-                      <item.icon size={16} className="text-muted-foreground" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">{item.label}</p>
-                      <p className="text-xs text-muted-foreground">{item.subtitle}</p>
-                    </div>
-                    <ChevronRight size={16} className="text-muted-foreground" />
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        </motion.div>
-      ))}
-
-      {/* Logout */}
+      {/* Sign Out */}
       <motion.button
-        className="w-full flex items-center justify-center gap-2 glass rounded-2xl p-4 text-destructive"
-        initial={{ y: 20, opacity: 0 }}
+        className="w-full flex items-center justify-center gap-2 glass rounded-2xl p-3 text-destructive"
+        initial={{ y: 10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.4 }}
+        transition={{ delay: 0.2 }}
         whileTap={{ scale: 0.98 }}
         onClick={signOut}
       >
-        <LogOut size={16} />
-        <span className="text-sm font-medium">Sign Out</span>
+        <LogOut size={14} />
+        <span className="text-sm font-medium">Abmelden</span>
       </motion.button>
     </motion.div>
   );

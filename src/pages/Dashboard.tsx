@@ -13,7 +13,7 @@ import { useWalletBalances } from '@/hooks/useWalletBalances';
 import { COINS, CoinType } from '@/lib/cryptoUtils';
 import SendModal from '@/components/wallet/SendModal';
 import BuyCryptoModal from '@/components/wallet/BuyCryptoModal';
-import { Bell, TrendingUp, ArrowLeftRight, Send, Zap, Wallet, Plus } from 'lucide-react';
+import { TrendingUp, ArrowLeftRight, Send, Zap, Plus } from 'lucide-react';
 
 const COIN_ID_MAP: Record<string, string> = {
   btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin',
@@ -36,7 +36,6 @@ const Dashboard = () => {
     .filter(t => Number(t.amount) < 0 && new Date(t.date) > new Date(Date.now() - 7 * 86400000))
     .reduce((sum, t) => sum + Math.abs(Number(t.amount)), 0);
 
-  // Calculate total crypto portfolio value in USD
   const portfolioUsd = COINS.reduce((sum, coin) => {
     const bal = balances[coin.id];
     if (!bal || bal === '—') return sum;
@@ -50,156 +49,146 @@ const Dashboard = () => {
     return prices.find(p => p.id === coingeckoId)?.current_price;
   };
 
-  const getMnemonic = () => {
-    // Mnemonic is only available after PIN unlock on WalletPage
-    // Return empty - SendModal will need wallet to be unlocked
-    return '';
-  };
-
   const handleSend = (coin: CoinType) => {
-    if (!hasWallet) {
-      navigate('/wallet');
-      return;
-    }
+    if (!hasWallet) { navigate('/wallet'); return; }
     setSendCoin(coin);
     setShowSend(true);
   };
 
-  const handleBuy = () => {
-    setShowBuy(true);
-  };
-
   const greetingHour = new Date().getHours();
-  const greeting = greetingHour < 12 ? 'Good morning' : greetingHour < 18 ? 'Good afternoon' : 'Good evening';
+  const greeting = greetingHour < 12 ? 'Guten Morgen' : greetingHour < 18 ? 'Guten Tag' : 'Guten Abend';
 
   return (
     <motion.div
-      className="min-h-screen pb-24 px-5 pt-14"
+      className="min-h-screen pb-24 px-4 pt-12"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
+      transition={{ duration: 0.3 }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Header - Compact */}
+      <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-muted-foreground text-sm">{greeting},</p>
-          <h1 className="text-xl font-semibold text-foreground">{profile?.display_name || 'User'}</h1>
+          <p className="text-muted-foreground text-xs">{greeting},</p>
+          <h1 className="text-lg font-semibold text-foreground">{profile?.display_name || 'User'}</h1>
         </div>
-        <button className="w-10 h-10 rounded-xl glass flex items-center justify-center">
-          <Bell size={18} className="text-muted-foreground" />
-        </button>
       </div>
 
       {/* 3D Card */}
       <motion.div
-        initial={{ y: 30, opacity: 0 }}
+        initial={{ y: 20, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.1, duration: 0.5, type: 'spring' }}
+        transition={{ delay: 0.05, duration: 0.4, type: 'spring' }}
       >
         <BankCard3D last4="4291" />
       </motion.div>
 
-      {/* Total Balance (Fiat + Crypto) */}
+      {/* Balance - Inline */}
       <motion.div
-        className="text-center mt-6 mb-2"
-        initial={{ y: 20, opacity: 0 }}
+        className="text-center mt-4 mb-3"
+        initial={{ y: 10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.2 }}
+        transition={{ delay: 0.1 }}
       >
-        <p className="text-muted-foreground text-xs tracking-widest uppercase mb-1">Bank Balance</p>
-        <p className="text-4xl font-bold text-foreground tracking-tight">
+        <p className="text-3xl font-bold text-foreground tracking-tight">
           {balance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
         </p>
         {portfolioUsd > 0 && (
-          <p className="text-sm text-beige-muted mt-1">
-            + ${portfolioUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} crypto
+          <p className="text-xs text-beige-muted mt-0.5">
+            + ${portfolioUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Crypto
           </p>
         )}
       </motion.div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Tighter */}
       <motion.div
-        className="flex gap-2 mb-6 mt-4"
-        initial={{ y: 20, opacity: 0 }}
+        className="flex gap-2 mb-4"
+        initial={{ y: 10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.25 }}
+        transition={{ delay: 0.15 }}
       >
         <motion.button
-          className="flex-1 h-12 rounded-xl glass text-sm font-medium flex items-center justify-center gap-2 text-foreground"
+          className="flex-1 h-11 rounded-xl glass text-xs font-medium flex items-center justify-center gap-1.5 text-foreground"
           whileTap={{ scale: 0.97 }}
           onClick={() => navigate('/transfer')}
         >
-          <ArrowLeftRight size={16} />
+          <ArrowLeftRight size={14} />
           Transfer
         </motion.button>
         <motion.button
-          className="flex-1 h-12 rounded-xl gradient-beige text-primary-foreground text-sm font-medium flex items-center justify-center gap-2"
+          className="flex-1 h-11 rounded-xl gradient-beige text-primary-foreground text-xs font-medium flex items-center justify-center gap-1.5"
           whileTap={{ scale: 0.97 }}
-          onClick={handleBuy}
+          onClick={() => setShowBuy(true)}
         >
-          <Zap size={16} />
-          Buy Crypto
+          <Zap size={14} />
+          Kaufen
         </motion.button>
         {!hasWallet && (
           <motion.button
-            className="h-12 w-12 rounded-xl glass flex items-center justify-center"
+            className="h-11 w-11 rounded-xl glass flex items-center justify-center"
             whileTap={{ scale: 0.97 }}
             onClick={() => navigate('/wallet')}
           >
-            <Plus size={18} className="text-beige" />
+            <Plus size={16} className="text-beige" />
           </motion.button>
         )}
       </motion.div>
 
-      {/* Crypto Portfolio */}
+      {/* Spending + Crypto side by side header */}
       <motion.div
-        initial={{ y: 20, opacity: 0 }}
+        initial={{ y: 10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
+        transition={{ delay: 0.2 }}
       >
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <TrendingUp size={14} className="text-beige" />
-            <p className="text-sm font-medium text-foreground">Crypto Markets</p>
+        {/* Spending Mini */}
+        <div className="glass rounded-2xl p-3 mb-3">
+          <div className="flex items-center justify-between mb-1">
+            <p className="text-xs font-medium text-foreground">Diese Woche</p>
+            <p className="text-[10px] text-muted-foreground">€{weekSpending.toFixed(0)} ausgegeben</p>
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
-            <p className="text-xs text-muted-foreground">Live</p>
+          <div className="h-[80px]">
+            <SpendingChart />
           </div>
         </div>
 
-        <div className="glass rounded-2xl px-3 divide-y divide-border mb-6">
+        {/* Crypto Markets */}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-1.5">
+            <TrendingUp size={12} className="text-beige" />
+            <p className="text-xs font-medium text-foreground">Märkte</p>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="w-1 h-1 rounded-full bg-success animate-pulse" />
+            <p className="text-[10px] text-muted-foreground">Live</p>
+          </div>
+        </div>
+
+        <div className="glass rounded-2xl px-2 divide-y divide-border mb-3">
           {cryptoLoading ? (
-            <div className="py-8 text-center text-muted-foreground text-sm">Loading prices...</div>
+            <div className="py-6 text-center text-muted-foreground text-xs">Laden...</div>
           ) : prices.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground text-sm">Unable to fetch prices</div>
+            <div className="py-6 text-center text-muted-foreground text-xs">Keine Preise verfügbar</div>
           ) : (
             prices.map((coin, i) => {
               const walletCoinId = Object.entries(COIN_ID_MAP).find(([_, v]) => v === coin.id)?.[0] as CoinType | undefined;
               const coinBalance = walletCoinId ? balances[walletCoinId] : undefined;
               return (
-                <CryptoRow
-                  key={coin.id}
-                  coin={coin}
-                  index={i}
-                  balance={coinBalance}
-                />
+                <CryptoRow key={coin.id} coin={coin} index={i} balance={coinBalance} />
               );
             })
           )}
         </div>
 
-        {/* Wallet send buttons for coins user holds */}
+        {/* Quick send for held coins */}
         {hasWallet && (
-          <div className="flex gap-2 mb-6">
+          <div className="flex gap-1.5 mb-4">
             {COINS.map(coin => (
               <motion.button
                 key={coin.id}
-                className="flex-1 h-10 rounded-xl glass text-xs font-medium flex items-center justify-center gap-1.5 text-foreground"
+                className="flex-1 h-9 rounded-xl glass text-[10px] font-medium flex items-center justify-center gap-1 text-foreground"
                 whileTap={{ scale: 0.96 }}
                 onClick={() => handleSend(coin.id)}
               >
-                <Send size={12} />
+                <Send size={10} />
                 {coin.symbol}
               </motion.button>
             ))}
@@ -207,37 +196,27 @@ const Dashboard = () => {
         )}
       </motion.div>
 
-      {/* Banking Section */}
+      {/* Transactions */}
       <motion.div
-        initial={{ y: 20, opacity: 0 }}
+        initial={{ y: 10, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.35 }}
+        transition={{ delay: 0.25 }}
       >
-        {/* Spending Chart */}
-        <div className="glass rounded-2xl p-4 mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-sm font-medium text-foreground">This Week</p>
-            <p className="text-xs text-muted-foreground">€{weekSpending.toFixed(0)} spent</p>
-          </div>
-          <SpendingChart />
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-medium text-foreground">Letzte Transaktionen</p>
+          <button className="text-[10px] text-beige-muted">Alle</button>
         </div>
-
-        {/* Transactions */}
-        <div className="flex items-center justify-between mb-3">
-          <p className="text-sm font-medium text-foreground">Recent Transactions</p>
-          <button className="text-xs text-beige-muted">See all</button>
-        </div>
-        <div className="glass rounded-2xl px-3 divide-y divide-border">
+        <div className="glass rounded-2xl px-2 divide-y divide-border">
           {loading ? (
-            <div className="py-8 text-center text-muted-foreground text-sm">Loading...</div>
+            <div className="py-6 text-center text-muted-foreground text-xs">Laden...</div>
           ) : transactions.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground text-sm">No transactions yet</div>
+            <div className="py-6 text-center text-muted-foreground text-xs">Noch keine Transaktionen</div>
           ) : (
-            transactions.map((t, i) => (
+            transactions.slice(0, 5).map((t, i) => (
               <TransactionRow key={t.id} transaction={{
                 id: t.id,
                 name: t.name,
-                category: t.category || 'Other',
+                category: t.category || 'Sonstiges',
                 amount: Number(t.amount),
                 date: t.date,
                 icon: t.icon || 'ArrowLeftRight',
