@@ -22,6 +22,8 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
   const dragStart = useRef({ x: 0, y: 0, rotX: 0, rotY: 0 });
 
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     setIsDragging(true);
     dragStart.current = {
       x: e.clientX,
@@ -34,6 +36,7 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
+    e.preventDefault();
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
     const sensitivity = 0.4;
@@ -43,33 +46,32 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
-    // Snap logic: normalize Y rotation to 0-360 range
     const currentY = rawRotateY.get();
     const norm = ((currentY % 360) + 360) % 360;
-    
-    // Snap to nearest face: front (0°) or back (180°)
+
     if (norm >= 90 && norm < 270) {
-      // Past 50% → snap to back (180°)
       const target = currentY - norm + 180;
       rawRotateY.set(target);
     } else {
-      // Before 50% → snap to front (0° / 360°)
       const target = norm >= 270 ? currentY - norm + 360 : currentY - norm;
       rawRotateY.set(target);
     }
-    // Snap X back to 0
     rawRotateX.set(0);
   }, [rawRotateX, rawRotateY]);
 
   return (
-    <div className="flex justify-center" style={{ perspective: 1200 }}>
+    <div
+      className="flex justify-center"
+      style={{ perspective: 1200, touchAction: 'none' }}
+    >
       <motion.div
         ref={cardRef}
-        className="relative w-full max-w-[340px] aspect-[1.586/1] rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing select-none"
+        className="relative w-full max-w-[320px] aspect-[1.586/1] rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing select-none"
         style={{
           rotateX,
           rotateY,
           transformStyle: 'preserve-3d',
+          touchAction: 'none',
         }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
@@ -79,7 +81,7 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
       >
         {/* Front Face */}
         <div
-          className="absolute inset-0 rounded-2xl metallic-sheen p-6 flex flex-col justify-between"
+          className="absolute inset-0 rounded-2xl metallic-sheen p-5 flex flex-col justify-between"
           style={{ backfaceVisibility: 'hidden' }}
         >
           <motion.div
@@ -94,18 +96,18 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
           <div className="flex justify-between items-start relative z-10">
             <div>
               <p className="text-foreground/60 text-[10px] font-medium tracking-[0.2em] uppercase">SimonDev</p>
-              <p className="text-beige text-sm font-semibold tracking-wider mt-0.5">BLACK</p>
+              <p className="text-beige text-xs font-semibold tracking-wider mt-0.5">BLACK</p>
             </div>
-            <Wifi className="text-foreground/30 rotate-90" size={20} />
+            <Wifi className="text-foreground/30 rotate-90" size={18} />
           </div>
           <div className="relative z-10">
-            <div className="w-10 h-7 rounded-md gradient-beige opacity-80" />
+            <div className="w-9 h-6 rounded-md gradient-beige opacity-80" />
           </div>
           <div className="flex justify-between items-end relative z-10">
-            <p className="text-foreground/50 text-sm font-light tracking-[0.25em]">•••• {last4}</p>
+            <p className="text-foreground/50 text-xs font-light tracking-[0.25em]">•••• {last4}</p>
             <div className="flex flex-col items-end">
-              <p className="text-foreground/30 text-[9px] tracking-wider">VALID THRU</p>
-              <p className="text-foreground/50 text-xs">12/29</p>
+              <p className="text-foreground/30 text-[8px] tracking-wider">VALID THRU</p>
+              <p className="text-foreground/50 text-[11px]">12/29</p>
             </div>
           </div>
           <div className="absolute inset-0 rounded-2xl border border-foreground/[0.06] pointer-events-none" />
@@ -116,16 +118,16 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
           className="absolute inset-0 rounded-2xl metallic-sheen flex flex-col justify-between"
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
         >
-          <div className="w-full h-12 bg-foreground/20 mt-6" />
-          <div className="px-6 flex items-center gap-3">
-            <div className="flex-1 h-8 rounded bg-foreground/10" />
-            <div className="bg-foreground/10 rounded px-3 py-1">
+          <div className="w-full h-10 bg-foreground/20 mt-5" />
+          <div className="px-5 flex items-center gap-3">
+            <div className="flex-1 h-7 rounded bg-foreground/10" />
+            <div className="bg-foreground/10 rounded px-2.5 py-1">
               <p className="text-foreground/50 text-xs font-mono tracking-widest">•••</p>
             </div>
           </div>
-          <div className="px-6 pb-4">
-            <p className="text-foreground/20 text-[8px] leading-relaxed">
-              This card is property of SimonDev Private Banking. Unauthorized use is prohibited. If found, please return to the nearest branch.
+          <div className="px-5 pb-3">
+            <p className="text-foreground/20 text-[7px] leading-relaxed">
+              This card is property of SimonDev Private Banking. Unauthorized use is prohibited.
             </p>
           </div>
           <div className="absolute inset-0 rounded-2xl border border-foreground/[0.06] pointer-events-none" />

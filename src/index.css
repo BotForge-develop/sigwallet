@@ -88,10 +88,16 @@
     overscroll-behavior: none;
   }
 
-  /* iOS-style scrollbar */
+  /* Hide all scrollbars */
   ::-webkit-scrollbar {
-    width: 0px;
-    background: transparent;
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  * {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
 }
 
