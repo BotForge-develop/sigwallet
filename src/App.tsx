@@ -4,7 +4,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
-import { AnimatePresence } from "framer-motion";
+import { Capacitor } from "@capacitor/core";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { initPushNotifications } from "@/lib/pushNotifications";
 import Dashboard from "./pages/Dashboard";
@@ -34,6 +34,7 @@ const AppRoutes = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const isNativeIos = Capacitor.getPlatform() === 'ios';
 
   const postRouteChange = (path: string) => {
     try {
@@ -45,14 +46,27 @@ const AppRoutes = () => {
     if (user) {
       initPushNotifications();
     }
-    postRouteChange(user ? location.pathname : '/auth');
-  }, [user, location.pathname]);
 
-  // Listen for native iOS tab bar taps
+    const targetPath = user ? location.pathname : '/auth';
+    postRouteChange(targetPath);
+
+    if (!isNativeIos) return;
+
+    const retries = [150, 500, 1200].map((delay) =>
+      window.setTimeout(() => postRouteChange(targetPath), delay)
+    );
+
+    return () => {
+      retries.forEach(window.clearTimeout);
+    };
+  }, [user, location.pathname, isNativeIos]);
+
   useEffect(() => {
     const handler = (e: Event) => {
       const route = (e as CustomEvent).detail;
-      if (route) navigate(route);
+      if (!route) return;
+      navigate(route);
+      postRouteChange(route);
     };
     window.addEventListener('nativeTabChange', handler);
     return () => window.removeEventListener('nativeTabChange', handler);
@@ -69,8 +83,8 @@ const AppRoutes = () => {
   );
 
   return (
-      <div className="fixed inset-0 overflow-hidden bg-background">
-        <div className="max-w-md mx-auto relative h-full overflow-y-auto overflow-x-hidden">
+    <div className="fixed inset-0 overflow-hidden bg-background">
+      <div className="max-w-md mx-auto relative h-full overflow-y-auto overflow-x-hidden">
         <Routes>
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />

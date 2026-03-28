@@ -16,21 +16,42 @@ const loadPlugin = async () => {
 
 const normalizeAccountKey = (email: string) => email.trim().toLowerCase();
 
-export const isBiometricAvailable = async (): Promise<boolean> => {
+export const getBiometricStatus = async () => {
   try {
     const plugin = await loadPlugin();
-    if (!plugin) return false;
-    const result = await plugin.checkBiometry();
-    return result.isAvailable;
-  } catch {
-    return false;
+    if (!plugin) {
+      return { isAvailable: false, reason: 'plugin_unavailable', code: 'plugin_unavailable' };
+    }
+
+    return await plugin.checkBiometry();
+  } catch (error: any) {
+    return {
+      isAvailable: false,
+      reason: error?.message ?? 'unknown_error',
+      code: error?.code ?? 'unknown_error',
+    };
   }
+};
+
+export const isBiometricAvailable = async (): Promise<boolean> => {
+  const result = await getBiometricStatus();
+  return Boolean(result?.isAvailable);
+};
+
+export const promptBiometricEnrollment = async (): Promise<void> => {
+  const plugin = await loadPlugin();
+  if (!plugin) throw new Error('Biometric plugin unavailable');
+
+  await plugin.authenticate({
+    reason: 'Face ID für diesen Account aktivieren',
+    cancelTitle: 'Abbrechen',
+    allowDeviceCredential: false,
+    iosFallbackTitle: 'Code verwenden',
+  });
 };
 
 export const saveCredentials = async (email: string, password: string): Promise<void> => {
   const normalizedEmail = normalizeAccountKey(email);
-  // Store credentials in localStorage (encrypted in native keychain would be ideal,
-  // but this plugin doesn't have credential storage - we use biometric gate instead)
   const encoded = btoa(JSON.stringify({ username: normalizedEmail, password }));
   localStorage.setItem(`${CREDENTIALS_PREFIX}${normalizedEmail}`, encoded);
   localStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
@@ -54,16 +75,14 @@ export const getCredentials = async (email?: string): Promise<{ username: string
     const stored = localStorage.getItem(`${CREDENTIALS_PREFIX}${account}`);
     if (!stored) return null;
 
-    // Prompt Face ID / Touch ID
     await plugin.authenticate({
       reason: 'Mit Face ID anmelden',
       cancelTitle: 'Abbrechen',
       allowDeviceCredential: false,
+      iosFallbackTitle: 'Code verwenden',
     });
 
-    // If verification passed, return stored credentials
-    const creds = JSON.parse(atob(stored));
-    return creds;
+    return JSON.parse(atob(stored));
   } catch {
     return null;
   }
