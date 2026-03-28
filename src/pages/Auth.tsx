@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Keyboard } from '@capacitor/keyboard';
+import { Keyboard, KeyboardResize } from '@capacitor/keyboard';
 import { Capacitor } from '@capacitor/core';
 
 const Auth = () => {
@@ -15,18 +15,24 @@ const Auth = () => {
   const [keyboardVisible, setKeyboardVisible] = useState(false);
 
   useEffect(() => {
-    if (Capacitor.isNativePlatform()) {
-      const showListener = Keyboard.addListener('keyboardWillShow', () => {
-        setKeyboardVisible(true);
-      });
-      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
-        setKeyboardVisible(false);
-      });
-      return () => {
-        showListener.then(l => l.remove());
-        hideListener.then(l => l.remove());
-      };
-    }
+    if (!Capacitor.isNativePlatform()) return;
+
+    Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => undefined);
+    Keyboard.setScroll({ isDisabled: true }).catch(() => undefined);
+
+    const showListener = Keyboard.addListener('keyboardWillShow', () => {
+      setKeyboardVisible(true);
+    });
+
+    const hideListener = Keyboard.addListener('keyboardWillHide', () => {
+      setKeyboardVisible(false);
+    });
+
+    return () => {
+      Keyboard.setScroll({ isDisabled: false }).catch(() => undefined);
+      showListener.then((listener) => listener.remove());
+      hideListener.then((listener) => listener.remove());
+    };
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -58,10 +64,9 @@ const Auth = () => {
   };
 
   return (
-    <div className={`min-h-screen flex flex-col items-center px-6 transition-all duration-300 ${keyboardVisible ? 'justify-start pt-12' : 'justify-center'}`}>
-      {/* Logo */}
+    <div className="min-h-[100dvh] flex flex-col items-center overflow-hidden px-6 pt-[max(env(safe-area-inset-top),2rem)] pb-[max(env(safe-area-inset-bottom),2rem)]">
       <motion.div
-        className="mb-12 text-center"
+        className={`text-center transition-all duration-300 ${keyboardVisible ? 'mb-6 scale-90 opacity-90' : 'mb-12 mt-auto'}`}
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
@@ -73,9 +78,8 @@ const Auth = () => {
         <p className="text-sm text-muted-foreground mt-1">Private Banking</p>
       </motion.div>
 
-      {/* Form */}
       <motion.form
-        className="w-full max-w-sm"
+        className="w-full max-w-sm mb-auto"
         onSubmit={handleSubmit}
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

@@ -45,7 +45,7 @@ const AppRoutes = () => {
   );
 
   return (
-    <div className="max-w-md mx-auto relative min-h-screen">
+    <div className="max-w-md mx-auto relative min-h-[100dvh]">
       <AnimatePresence mode="wait">
         <Routes>
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
