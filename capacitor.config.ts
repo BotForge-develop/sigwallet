@@ -12,6 +12,10 @@ const config: CapacitorConfig = {
       style: 'LIGHT',
       backgroundColor: '#000000',
     },
+    Keyboard: {
+      resize: 'none',
+      scrollPadding: false,
+    },
   },
 };
 
