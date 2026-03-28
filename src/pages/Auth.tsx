@@ -11,7 +11,6 @@ import {
   saveCredentials,
   getCredentials,
 } from '@/lib/biometrics';
-import liquidGlassAfter from '@/assets/apple-liquid-glass-after.png';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -158,13 +157,11 @@ const Auth = () => {
     <div className="relative h-full overflow-hidden px-6" style={{ touchAction: 'manipulation', overscrollBehavior: 'none' }}>
       <div className="absolute inset-0 overflow-hidden">
         <div className="pointer-events-none absolute inset-x-4 top-[max(env(safe-area-inset-top),1rem)] z-0 opacity-90">
-          <div className="glass-liquid rounded-[2rem] p-2">
-            <img
-              src={liquidGlassAfter}
-              alt="Apple Liquid Glass reference"
-              className="h-24 w-full rounded-[1.5rem] object-cover opacity-70"
-              loading="eager"
-            />
+          <div className="glass-liquid relative h-24 rounded-[2rem] overflow-hidden border border-white/10">
+            <div className="absolute inset-0 bg-liquid-surface" />
+            <div className="absolute -left-8 top-2 h-20 w-32 rounded-full bg-liquid-highlight blur-2xl" />
+            <div className="absolute right-2 top-3 h-16 w-16 rounded-full border border-white/20 bg-white/10 backdrop-blur-3xl" />
+            <div className="absolute bottom-3 left-1/2 h-8 w-40 -translate-x-1/2 rounded-full bg-white/10 blur-xl" />
           </div>
         </div>
 
