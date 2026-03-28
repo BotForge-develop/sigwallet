@@ -12,6 +12,22 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      const showListener = Keyboard.addListener('keyboardWillShow', () => {
+        setKeyboardVisible(true);
+      });
+      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
+        setKeyboardVisible(false);
+      });
+      return () => {
+        showListener.then(l => l.remove());
+        hideListener.then(l => l.remove());
+      };
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
