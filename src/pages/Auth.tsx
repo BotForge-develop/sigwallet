@@ -6,11 +6,12 @@ import { toast } from 'sonner';
 import { Keyboard, KeyboardResize } from '@capacitor/keyboard';
 import { Capacitor } from '@capacitor/core';
 import {
-  isBiometricAvailable,
-  isBiometricEnabled,
-  saveCredentials,
-  getCredentials,
   getBiometricAccount,
+  getBiometricStatus,
+  getCredentials,
+  isBiometricEnabled,
+  promptBiometricEnrollment,
+  saveCredentials,
 } from '@/lib/biometrics';
 
 const Auth = () => {
@@ -24,13 +25,12 @@ const Auth = () => {
   const [showEnableBiometric, setShowEnableBiometric] = useState(false);
   const [pendingCreds, setPendingCreds] = useState<{ email: string; password: string } | null>(null);
 
-  // Check biometric availability on mount
   useEffect(() => {
     const check = async () => {
-      const available = await isBiometricAvailable();
+      const result = await getBiometricStatus();
+      const available = Boolean(result?.isAvailable);
       setBiometricReady(available);
 
-      // Auto-trigger Face ID if already enabled
       if (available && isBiometricEnabled()) {
         handleBiometricLogin();
       }
@@ -42,24 +42,25 @@ const Auth = () => {
     setLoading(true);
     try {
       const creds = await getCredentials();
-      if (creds) {
-        setEmail(creds.username);
-        const { error } = await supabase.auth.signInWithPassword({
-          email: creds.username,
-          password: creds.password,
-        });
-        if (error) throw error;
-        toast.success('Willkommen zurück!');
+      if (!creds) {
+        toast.error('Face ID ist auf diesem Gerät oder für diesen Account noch nicht aktiv.');
+        return;
       }
-    } catch (error: any) {
-      // Face ID cancelled or credentials invalid – show normal login
+
+      setEmail(creds.username);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: creds.username,
+        password: creds.password,
+      });
+      if (error) throw error;
+      toast.success('Willkommen zurück!');
+    } catch {
       toast.error('Face ID fehlgeschlagen. Bitte manuell anmelden.');
     } finally {
       setLoading(false);
     }
   }, []);
 
-  // Prevent iOS WebView from auto-scrolling to focused inputs
   useEffect(() => {
     const preventScroll = () => {
       window.scrollTo(0, 0);
@@ -112,13 +113,12 @@ const Auth = () => {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
 
-        // After successful login, check if we should offer biometric setup
-        const available = await isBiometricAvailable();
-        if (available && !isBiometricEnabled(email)) {
+        const biometricStatus = await getBiometricStatus();
+        if (biometricStatus.isAvailable && !isBiometricEnabled(email)) {
           setPendingCreds({ email, password });
           setShowEnableBiometric(true);
           setLoading(false);
-          return; // Don't navigate yet – show biometric prompt
+          return;
         }
 
         toast.success('Welcome back!');
@@ -142,12 +142,21 @@ const Auth = () => {
   };
 
   const handleEnableBiometric = async () => {
-    if (pendingCreds) {
+    if (!pendingCreds) return;
+
+    setLoading(true);
+    try {
+      await promptBiometricEnrollment();
       await saveCredentials(pendingCreds.email, pendingCreds.password);
-      toast.success('Face ID aktiviert!');
+      setBiometricReady(true);
+      toast.success(`Face ID für ${pendingCreds.email} aktiviert!`);
+      setShowEnableBiometric(false);
+      setPendingCreds(null);
+    } catch (error: any) {
+      toast.error(error?.message || 'Face ID konnte nicht aktiviert werden.');
+    } finally {
+      setLoading(false);
     }
-    setShowEnableBiometric(false);
-    setPendingCreds(null);
   };
 
   const handleSkipBiometric = () => {
@@ -198,7 +207,7 @@ const Auth = () => {
                 <div className="text-center">
                   <h2 className="text-lg font-semibold text-foreground">Face ID aktivieren?</h2>
                   <p className="text-sm text-muted-foreground mt-2 px-4">
-                    Melde dich beim nächsten Mal einfach mit Face ID an — schnell und sicher.
+                    Dieser Account wird nur auf diesem iPhone mit Face ID verknüpft.
                   </p>
                 </div>
                 <div className="w-full space-y-3">
@@ -207,14 +216,16 @@ const Auth = () => {
                     className="w-full h-14 rounded-2xl gradient-beige text-primary-foreground font-semibold text-base flex items-center justify-center gap-2"
                     whileTap={{ scale: 0.97 }}
                     onClick={handleEnableBiometric}
+                    disabled={loading}
                   >
-                    <ScanFace size={20} />
+                    {loading ? <Loader2 size={20} className="animate-spin" /> : <ScanFace size={20} />}
                     Face ID aktivieren
                   </motion.button>
                   <button
                     type="button"
                     className="w-full text-center text-sm text-muted-foreground"
                     onClick={handleSkipBiometric}
+                    disabled={loading}
                   >
                     Später
                   </button>
@@ -286,7 +297,6 @@ const Auth = () => {
                     )}
                   </motion.button>
 
-                  {/* Face ID quick-login button */}
                   {biometricReady && isBiometricEnabled() && isLogin && (
                     <motion.button
                       type="button"
