@@ -25,8 +25,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
-  const biometricGateEnabled = Capacitor.isNativePlatform() && isBiometricEnabled();
-  const isLockedRef = useRef(biometricGateEnabled);
+  const isNative = Capacitor.isNativePlatform();
+  const isLockedRef = useRef(isNative);
 
   useEffect(() => {
     let mounted = true;
@@ -35,7 +35,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
 
-      if (biometricGateEnabled && isLockedRef.current && event === 'INITIAL_SESSION') {
+      // On native iOS: block initial session restore — force re-auth
+      if (isNative && isLockedRef.current && event === 'INITIAL_SESSION') {
         setSession(null);
         setUser(null);
         setLoading(false);
@@ -47,7 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
 
       if (event === 'SIGNED_OUT') {
-        isLockedRef.current = biometricGateEnabled;
+        isLockedRef.current = isNative;
       }
 
       setSession(session);
@@ -57,7 +58,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Then check for existing session
     const initializeAuth = async () => {
-      if (biometricGateEnabled) {
+      // On native: always sign out locally on cold start to force /auth
+      if (isNative) {
         isLockedRef.current = true;
         await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
         if (!mounted) return;
@@ -79,9 +81,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     void initializeAuth();
 
     // Lock app when it goes to background (banking behavior)
-    if (Capacitor.isNativePlatform()) {
+    if (isNative) {
       const listener = CapApp.addListener('appStateChange', ({ isActive }) => {
-        if (!isActive && isBiometricEnabled()) {
+        if (!isActive) {
           isLockedRef.current = true;
           void supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
           setUser(null);
@@ -99,7 +101,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, [biometricGateEnabled]);
+  }, [isNative]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
