@@ -1,6 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
+import { isBiometricEnabled } from '@/lib/biometrics';
+import { Capacitor } from '@capacitor/core';
+import { App as CapApp } from '@capacitor/app';
 
 interface AuthContextType {
   user: User | null;
@@ -37,6 +40,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUser(session?.user ?? null);
       setLoading(false);
     });
+
+    // Lock app when it goes to background (banking behavior)
+    if (Capacitor.isNativePlatform()) {
+      const listener = CapApp.addListener('appStateChange', ({ isActive }) => {
+        if (!isActive && isBiometricEnabled()) {
+          // App went to background — clear session so user must re-auth
+          setUser(null);
+          setSession(null);
+        }
+      });
+      return () => {
+        subscription.unsubscribe();
+        listener.then(l => l.remove());
+      };
+    }
 
     return () => subscription.unsubscribe();
   }, []);
