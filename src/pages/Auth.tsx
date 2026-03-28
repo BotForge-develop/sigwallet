@@ -14,6 +14,24 @@ const Auth = () => {
   const [loading, setLoading] = useState(false);
   const [keyboardOffset, setKeyboardOffset] = useState(0);
 
+  // Prevent iOS WebView from auto-scrolling to focused inputs
+  useEffect(() => {
+    const preventScroll = () => {
+      window.scrollTo(0, 0);
+      document.body.scrollTop = 0;
+      document.documentElement.scrollTop = 0;
+    };
+
+    // Catch any scroll attempts
+    window.addEventListener('scroll', preventScroll, { passive: false });
+    document.addEventListener('scroll', preventScroll, { passive: false });
+
+    return () => {
+      window.removeEventListener('scroll', preventScroll);
+      document.removeEventListener('scroll', preventScroll);
+    };
+  }, []);
+
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
@@ -23,10 +41,19 @@ const Auth = () => {
     const showListener = Keyboard.addListener('keyboardWillShow', (info) => {
       const offset = Math.min(Math.max(info.keyboardHeight - 220, 0), 120);
       setKeyboardOffset(offset);
+      // Force scroll reset after keyboard opens
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+      });
     });
 
     const hideListener = Keyboard.addListener('keyboardWillHide', () => {
       setKeyboardOffset(0);
+      requestAnimationFrame(() => {
+        window.scrollTo(0, 0);
+        document.body.scrollTop = 0;
+      });
     });
 
     return () => {
