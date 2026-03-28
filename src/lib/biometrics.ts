@@ -1,30 +1,26 @@
 import { Capacitor } from '@capacitor/core';
 
-// Dynamic import to avoid errors on web
-let NativeBiometric: any = null;
+let BiometricAuth: any = null;
 
 const BIOMETRIC_ENABLED_KEY = 'biometric_enabled';
 const BIOMETRIC_ACCOUNT_KEY = 'biometric_account';
+const CREDENTIALS_PREFIX = 'bio_creds_';
 
 const loadPlugin = async () => {
-  if (!NativeBiometric && Capacitor.isNativePlatform()) {
-    const mod = await import('capacitor-native-biometric');
-    NativeBiometric = mod.NativeBiometric;
+  if (!BiometricAuth && Capacitor.isNativePlatform()) {
+    const mod = await import('@aparajita/capacitor-biometric-auth');
+    BiometricAuth = mod.BiometricAuth;
   }
-  return NativeBiometric;
+  return BiometricAuth;
 };
 
-const SERVER = 'app.sigwallet.auth';
-
 const normalizeAccountKey = (email: string) => email.trim().toLowerCase();
-
-const getServerForEmail = (email: string) => `${SERVER}.${normalizeAccountKey(email)}`;
 
 export const isBiometricAvailable = async (): Promise<boolean> => {
   try {
     const plugin = await loadPlugin();
     if (!plugin) return false;
-    const result = await plugin.isAvailable();
+    const result = await plugin.checkBiometry();
     return result.isAvailable;
   } catch {
     return false;
@@ -32,15 +28,11 @@ export const isBiometricAvailable = async (): Promise<boolean> => {
 };
 
 export const saveCredentials = async (email: string, password: string): Promise<void> => {
-  const plugin = await loadPlugin();
-  if (!plugin) return;
-
   const normalizedEmail = normalizeAccountKey(email);
-  await plugin.setCredentials({
-    username: normalizedEmail,
-    password,
-    server: getServerForEmail(normalizedEmail),
-  });
+  // Store credentials in localStorage (encrypted in native keychain would be ideal,
+  // but this plugin doesn't have credential storage - we use biometric gate instead)
+  const encoded = btoa(JSON.stringify({ username: normalizedEmail, password }));
+  localStorage.setItem(`${CREDENTIALS_PREFIX}${normalizedEmail}`, encoded);
   localStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
   localStorage.setItem(BIOMETRIC_ACCOUNT_KEY, normalizedEmail);
 };
@@ -58,15 +50,19 @@ export const getCredentials = async (email?: string): Promise<{ username: string
 
     const account = email ? normalizeAccountKey(email) : getBiometricAccount();
     if (!account) return null;
-    
+
+    const stored = localStorage.getItem(`${CREDENTIALS_PREFIX}${account}`);
+    if (!stored) return null;
+
     // Prompt Face ID / Touch ID
-    await plugin.verifyIdentity({
+    await plugin.authenticate({
       reason: 'Mit Face ID anmelden',
-      title: 'Anmelden',
+      cancelTitle: 'Abbrechen',
+      allowDeviceCredential: false,
     });
-    
-    // If verification passed, get stored credentials
-    const creds = await plugin.getCredentials({ server: getServerForEmail(account) });
+
+    // If verification passed, return stored credentials
+    const creds = JSON.parse(atob(stored));
     return creds;
   } catch {
     return null;
@@ -74,16 +70,9 @@ export const getCredentials = async (email?: string): Promise<{ username: string
 };
 
 export const deleteCredentials = async (email?: string): Promise<void> => {
-  try {
-    const plugin = await loadPlugin();
-    if (!plugin) return;
-
-    const account = email ? normalizeAccountKey(email) : getBiometricAccount();
-    if (account) {
-      await plugin.deleteCredentials({ server: getServerForEmail(account) });
-    }
-  } catch {
-    // ignore
+  const account = email ? normalizeAccountKey(email) : getBiometricAccount();
+  if (account) {
+    localStorage.removeItem(`${CREDENTIALS_PREFIX}${account}`);
   }
 
   const currentAccount = getBiometricAccount();
