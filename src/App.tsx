@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
 import { AnimatePresence } from "framer-motion";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { initPushNotifications } from "@/lib/pushNotifications";
@@ -33,18 +33,20 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const postRouteChange = (path: string) => {
+    try {
+      (window as any).webkit?.messageHandlers?.routeChange?.postMessage(path);
+    } catch {}
+  };
 
   useEffect(() => {
     if (user) {
       initPushNotifications();
     }
-    // Notify native iOS layer about route visibility (tab bar show/hide)
-    try {
-      (window as any).webkit?.messageHandlers?.routeChange?.postMessage(
-        user ? window.location.pathname : '/auth'
-      );
-    } catch {}
-  }, [user]);
+    postRouteChange(user ? location.pathname : '/auth');
+  }, [user, location.pathname]);
 
   // Listen for native iOS tab bar taps
   useEffect(() => {
@@ -56,14 +58,9 @@ const AppRoutes = () => {
     return () => window.removeEventListener('nativeTabChange', handler);
   }, [navigate]);
 
-  // Report route changes to native layer
   useEffect(() => {
-    try {
-      (window as any).webkit?.messageHandlers?.routeChange?.postMessage(
-        window.location.pathname
-      );
-    } catch {}
-  });
+    postRouteChange(location.pathname);
+  }, [location.pathname]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center">
