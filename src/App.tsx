@@ -61,6 +61,7 @@ const AppRoutes = () => {
       </AnimatePresence>
       {user && <BottomNav />}
     </div>
+    </div>
   );
 };
 

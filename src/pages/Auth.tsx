@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
@@ -12,7 +12,8 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
@@ -20,18 +21,20 @@ const Auth = () => {
     Keyboard.setResizeMode({ mode: KeyboardResize.None }).catch(() => undefined);
     Keyboard.setScroll({ isDisabled: true }).catch(() => undefined);
 
-    const showListener = Keyboard.addListener('keyboardWillShow', () => {
-      setKeyboardVisible(true);
+    const showListener = Keyboard.addListener('keyboardWillShow', (info) => {
+      // Move content up by a bounded amount (max 160px)
+      const offset = Math.min(info.keyboardHeight * 0.4, 160);
+      setKeyboardOffset(offset);
     });
 
     const hideListener = Keyboard.addListener('keyboardWillHide', () => {
-      setKeyboardVisible(false);
+      setKeyboardOffset(0);
     });
 
     return () => {
       Keyboard.setScroll({ isDisabled: false }).catch(() => undefined);
-      showListener.then((listener) => listener.remove());
-      hideListener.then((listener) => listener.remove());
+      showListener.then((l) => l.remove());
+      hideListener.then((l) => l.remove());
     };
   }, []);
 
@@ -64,99 +67,114 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center overflow-hidden px-6 pt-[max(env(safe-area-inset-top),2rem)] pb-[max(env(safe-area-inset-bottom),2rem)]">
-      <motion.div
-        className={`text-center transition-all duration-300 ${keyboardVisible ? 'mb-6 scale-90 opacity-90' : 'mb-12 mt-auto'}`}
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6 }}
+    <div
+      className="h-full overflow-hidden flex flex-col items-center px-6 touch-manipulation"
+      style={{ overscrollBehavior: 'none' }}
+    >
+      <div
+        ref={contentRef}
+        className="w-full max-w-sm flex flex-col items-center pt-[max(env(safe-area-inset-top),3rem)]"
+        style={{
+          transform: `translateY(-${keyboardOffset}px)`,
+          transition: 'transform 0.28s cubic-bezier(0.4, 0, 0.2, 1)',
+          willChange: 'transform',
+        }}
       >
-        <div className="w-16 h-16 rounded-2xl gradient-beige mx-auto mb-4 flex items-center justify-center">
-          <span className="text-2xl font-bold text-primary-foreground">S</span>
-        </div>
-        <h1 className="text-2xl font-bold text-foreground tracking-tight">SimonDev</h1>
-        <p className="text-sm text-muted-foreground mt-1">Private Banking</p>
-      </motion.div>
-
-      <motion.form
-        className="w-full max-w-sm mb-auto"
-        onSubmit={handleSubmit}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-      >
-        <AnimatePresence mode="wait">
-          {!isLogin && (
-            <motion.div
-              key="name"
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              className="mb-3 overflow-hidden"
-            >
-              <div className="flex items-center gap-3 glass rounded-2xl px-4 h-14">
-                <User size={18} className="text-muted-foreground flex-shrink-0" />
-                <input
-                  className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-                  placeholder="Display Name"
-                  value={displayName}
-                  onChange={(e) => setDisplayName(e.target.value)}
-                />
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-
-        <div className="flex items-center gap-3 glass rounded-2xl px-4 h-14 mb-3">
-          <Mail size={18} className="text-muted-foreground flex-shrink-0" />
-          <input
-            type="email"
-            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-
-        <div className="flex items-center gap-3 glass rounded-2xl px-4 h-14 mb-6">
-          <Lock size={18} className="text-muted-foreground flex-shrink-0" />
-          <input
-            type="password"
-            className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
-            placeholder="Password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-          />
-        </div>
-
-        <motion.button
-          type="submit"
-          className="w-full h-14 rounded-2xl gradient-beige text-primary-foreground font-semibold text-base flex items-center justify-center gap-2"
-          whileTap={{ scale: 0.97 }}
-          disabled={loading}
+        {/* Brand header — fixed position, no reflow */}
+        <motion.div
+          className="text-center mb-10 mt-16"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
         >
-          {loading ? (
-            <Loader2 size={20} className="animate-spin" />
-          ) : (
-            <>
-              {isLogin ? 'Sign In' : 'Create Account'}
-              <ArrowRight size={18} />
-            </>
-          )}
-        </motion.button>
+          <div className="w-16 h-16 rounded-2xl gradient-beige mx-auto mb-4 flex items-center justify-center">
+            <span className="text-2xl font-bold text-primary-foreground">S</span>
+          </div>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">SimonDev</h1>
+          <p className="text-sm text-muted-foreground mt-1">Private Banking</p>
+        </motion.div>
 
-        <button
-          type="button"
-          className="w-full text-center mt-4 text-sm text-muted-foreground"
-          onClick={() => setIsLogin(!isLogin)}
+        {/* Form — anchored, no auto-margins */}
+        <motion.form
+          className="w-full"
+          onSubmit={handleSubmit}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
         >
-          {isLogin ? "Don't have an account? " : 'Already have an account? '}
-          <span className="text-beige font-medium">{isLogin ? 'Sign Up' : 'Sign In'}</span>
-        </button>
-      </motion.form>
+          <AnimatePresence mode="wait">
+            {!isLogin && (
+              <motion.div
+                key="name"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="mb-3 overflow-hidden"
+              >
+                <div className="flex items-center gap-3 glass rounded-2xl px-4 h-14">
+                  <User size={18} className="text-muted-foreground flex-shrink-0" />
+                  <input
+                    className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+                    placeholder="Display Name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                  />
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="flex items-center gap-3 glass rounded-2xl px-4 h-14 mb-3">
+            <Mail size={18} className="text-muted-foreground flex-shrink-0" />
+            <input
+              type="email"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+              placeholder="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="flex items-center gap-3 glass rounded-2xl px-4 h-14 mb-6">
+            <Lock size={18} className="text-muted-foreground flex-shrink-0" />
+            <input
+              type="password"
+              className="flex-1 bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              minLength={6}
+            />
+          </div>
+
+          <motion.button
+            type="submit"
+            className="w-full h-14 rounded-2xl gradient-beige text-primary-foreground font-semibold text-base flex items-center justify-center gap-2"
+            whileTap={{ scale: 0.97 }}
+            disabled={loading}
+          >
+            {loading ? (
+              <Loader2 size={20} className="animate-spin" />
+            ) : (
+              <>
+                {isLogin ? 'Sign In' : 'Create Account'}
+                <ArrowRight size={18} />
+              </>
+            )}
+          </motion.button>
+
+          <button
+            type="button"
+            className="w-full text-center mt-4 text-sm text-muted-foreground"
+            onClick={() => setIsLogin(!isLogin)}
+          >
+            {isLogin ? "Don't have an account? " : 'Already have an account? '}
+            <span className="text-beige font-medium">{isLogin ? 'Sign Up' : 'Sign In'}</span>
+          </button>
+        </motion.form>
+      </div>
     </div>
   );
 };
