@@ -1,83 +1,66 @@
 
-Goal: get both native iOS features working reliably: Face ID and the native Apple-style tab bar.
 
-What I found
-- The web app side is already prepared for a native tab bar:
-  - `src/components/BottomNav.tsx` hides the web tab bar on iOS.
-  - `src/App.tsx` sends route changes to native via `window.webkit.messageHandlers.routeChange`.
-- The current blocker is very likely in the local Xcode project, not in the Lovable preview.
-- I also found a strong Face ID root cause: your app uses Capacitor 8, but the installed biometric package in `package.json` is `capacitor-native-biometric@4.2.2`, and its npm README says it only supports Capacitor 3 and 4. That makes it a likely reason why Face ID never appears on iOS.
-- I could not inspect the native iOS files directly because there is no `ios/` folder in this repo snapshot, so the Liquid Glass issue is almost certainly inside your local Xcode project files.
+## Diagnosis: Why Liquid Glass and Face ID Still Don't Work
 
-Implementation plan
+After deep research, I found the **real root causes** that we've been missing:
 
-1. Fix the biometric dependency mismatch
-- Replace `capacitor-native-biometric` with a Capacitor-8-compatible biometric plugin.
-- Update `src/lib/biometrics.ts` imports and method calls to the new plugin API.
-- Keep the current account-bound behavior:
-  - save credentials per email
-  - only offer Face ID for the same account
-  - show the Face ID prompt right after successful manual login
+### Problem 1: Liquid Glass Tab Bar
 
-2. Harden the auth flow for native iOS
-- Keep the existing “manual login first, then ask to enable Face ID” pattern in `src/pages/Auth.tsx`.
-- Add clearer failure handling so the app can distinguish:
-  - plugin unavailable
-  - permission missing
-  - biometric enrollment missing
-  - user canceled
-- Ensure the login page only auto-attempts biometrics when credentials actually exist for that account.
+**Liquid Glass only appears when ALL of these are true:**
+1. Built with **Xcode 26** (you have this)
+2. **iOS Deployment Target** set to **26.0** in Xcode Build Settings
+3. **No** `UIDesignRequiresCompatibility` key in Info.plist
+4. **No** `UIApplicationSceneManifest` in Info.plist (if present, SceneDelegate takes over and ignores your AppDelegate's programmatic UITabBarController)
+5. **No** `SceneDelegate.swift` file in the project
 
-3. Fix the native tab bar ownership in Xcode
-- Ensure the native app lifecycle is fully controlled by `AppDelegate`.
-- Remove any storyboard/scene-based startup that can override the programmatic `UITabBarController`.
-- Verify the native bar is created as the real root view controller and not covered by another controller.
-- Avoid aggressive custom `UITabBarAppearance` styling on newer iOS, because that can suppress the Apple glass effect.
+**The critical issue**: When you run `npx cap sync ios` or `npx cap add ios`, Capacitor **regenerates** `SceneDelegate.swift` and adds `UIApplicationSceneManifest` back to the Xcode-managed Info.plist. Even if you deleted them before, they come back after every sync. This means your programmatic `UITabBarController` in `AppDelegate` is never used as the root — the SceneDelegate overrides it.
 
-4. Fix required iOS permissions/config
-- Add `NSFaceIDUsageDescription` in `Info.plist`.
-- Verify the biometric plugin is actually linked into the iOS app target.
-- Check raw Info.plist keys, not just the friendly names in Xcode.
+### Problem 2: Face ID
 
-5. End-to-end native validation
-- Test this exact sequence on a real iPhone:
-  1. cold launch app
-  2. sign in manually
-  3. get “Enable Face ID?” prompt
-  4. enable Face ID
-  5. background/close app
-  6. reopen app
-  7. Face ID login appears
-  8. native tab bar is visible after login and hidden on `/auth`
+The plugin `@aparajita/capacitor-biometric-auth` is now in `package.json`, but it needs to be **linked into the Xcode project** via Swift Package Manager. Running `npx cap sync ios` should auto-link it, but only if the ios platform was created with SPM support.
 
-Exact files I would update
-- `package.json`
-- `src/lib/biometrics.ts`
-- `src/pages/Auth.tsx`
-- possibly `src/contexts/AuthContext.tsx` for better biometric unlock behavior
-- local native iOS files in Xcode:
-  - `ios/App/App/Info.plist`
-  - `ios/App/App/AppDelegate.swift`
-  - remove or neutralize `SceneDelegate.swift`
-  - remove `Main.storyboard` startup usage
+---
 
-Technical details
-- Evidence for Face ID root cause:
-  - `package.json` shows Capacitor 8 packages
-  - `package.json` also shows `capacitor-native-biometric@4.2.2`
-  - npm docs for that package explicitly say “Only supports Capacitor 3 and 4”
-- Evidence web side is ready:
-  - `BottomNav.tsx` already hides the web bar on iOS
-  - `App.tsx` already posts route changes to native
-- Therefore:
-  - Face ID failure is likely plugin compatibility + missing iOS permission/linking
-  - Liquid Glass failure is likely local Xcode scene/storyboard/root-controller setup
+## Plan
 
-Most likely final diagnosis
-- Face ID is failing because the biometric plugin is outdated/incompatible with Capacitor 8.
-- Liquid Glass is failing because the local iOS app is not actually booting through the custom native tab bar controller anymore, or its appearance is being overridden.
+### Step 1: Update AppDelegate.swift
 
-If you approve, my next implementation pass will focus on:
-1. replacing the biometric plugin with a Capacitor-8-compatible one
-2. adapting the auth code to it
-3. giving you a precise Xcode-native checklist for the local files that must match the web code
+The current code already looks correct. One small but important change: on iOS 26, do NOT set `tintColor` or `unselectedItemTintColor` on the tab bar before it's shown — these can interfere with the Liquid Glass material. Move tint settings inside the `#available` branch for pre-iOS-26 only.
+
+### Step 2: Provide a post-sync fixup script
+
+Since Capacitor regenerates SceneDelegate on every sync, I'll create a shell script the user runs **after every `npx cap sync ios`** that:
+- Deletes `ios/App/App/SceneDelegate.swift`
+- Removes `UIApplicationSceneManifest` from the Xcode Info.plist
+- Removes `UIMainStoryboardFile` from the Xcode Info.plist  
+- Sets the deployment target to 26.0
+
+### Step 3: Provide complete step-by-step rebuild instructions
+
+A clear numbered list:
+1. `rm -rf ios/`
+2. `npm install && npm run build`
+3. `npx cap add ios --packagemanager SPM`  (SPM is needed for the biometric plugin)
+4. `npx cap sync ios`
+5. Run the fixup script (removes SceneDelegate, scene manifest)
+6. Copy `ios-native/AppDelegate.swift` → `ios/App/App/AppDelegate.swift`
+7. Copy `ios-native/Info.plist` → `ios/App/App/Info.plist`
+8. Open Xcode, set deployment target to 26.0
+9. Clean Build (⇧⌘K), then Run
+
+### Files to create/update
+- `ios-native/AppDelegate.swift` — remove tint color overrides for iOS 26+
+- `ios-native/post-sync.sh` — new script to fix Capacitor's auto-generated files after every sync
+- `ios-native/Info.plist` — already correct, no changes needed
+
+### Technical Details
+
+**Why SceneDelegate breaks everything:**
+In iOS 13+, if `UIApplicationSceneManifest` exists in Info.plist, iOS ignores the `window` property in `AppDelegate.didFinishLaunchingWithOptions`. The `SceneDelegate.scene(_:willConnectTo:)` method creates its own window and root view controller. Your programmatic `UITabBarController` never gets used.
+
+**Why Capacitor keeps regenerating it:**
+`npx cap sync` copies template files including SceneDelegate. This is by design in Capacitor's iOS template. The only reliable fix is to delete it after every sync.
+
+**Why SPM matters for Face ID:**
+`@aparajita/capacitor-biometric-auth` distributes as a Swift Package. If the iOS platform was created with CocoaPods (the default without `--packagemanager SPM`), the plugin won't be linked. SPM is the recommended approach for Capacitor 8.
+
