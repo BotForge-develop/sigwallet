@@ -45,8 +45,8 @@ const AppRoutes = () => {
   );
 
   return (
-    <div className="fixed inset-0 overflow-hidden">
-      <div className="max-w-md mx-auto relative h-full overflow-hidden">
+      <div className="fixed inset-0 overflow-hidden">
+        <div className="max-w-md mx-auto relative h-full overflow-y-auto overflow-x-hidden">
         <Routes>
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
