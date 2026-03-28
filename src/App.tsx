@@ -46,8 +46,7 @@ const AppRoutes = () => {
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-    <div className="max-w-md mx-auto relative h-full overflow-y-auto overflow-x-hidden">
-      <AnimatePresence mode="wait">
+      <div className="max-w-md mx-auto relative h-full overflow-hidden">
         <Routes>
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
@@ -58,9 +57,8 @@ const AppRoutes = () => {
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
-      </AnimatePresence>
-      {user && <BottomNav />}
-    </div>
+        {user && <BottomNav />}
+      </div>
     </div>
   );
 };
