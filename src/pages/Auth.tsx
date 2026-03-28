@@ -156,15 +156,6 @@ const Auth = () => {
   return (
     <div className="relative h-full overflow-hidden px-6" style={{ touchAction: 'manipulation', overscrollBehavior: 'none' }}>
       <div className="absolute inset-0 overflow-hidden">
-        <div className="pointer-events-none absolute inset-x-4 top-[max(env(safe-area-inset-top),1rem)] z-0 opacity-90">
-          <div className="glass-liquid relative h-24 rounded-[2rem] overflow-hidden border border-white/10">
-            <div className="absolute inset-0 bg-liquid-surface" />
-            <div className="absolute -left-8 top-2 h-20 w-32 rounded-full bg-liquid-highlight blur-2xl" />
-            <div className="absolute right-2 top-3 h-16 w-16 rounded-full border border-white/20 bg-white/10 backdrop-blur-3xl" />
-            <div className="absolute bottom-3 left-1/2 h-8 w-40 -translate-x-1/2 rounded-full bg-white/10 blur-xl" />
-          </div>
-        </div>
-
         <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-64 bg-gradient-to-b from-accent/10 via-transparent to-transparent" />
 
         <div

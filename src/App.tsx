@@ -46,12 +46,6 @@ const AppRoutes = () => {
 
   return (
       <div className="fixed inset-0 overflow-hidden bg-background">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-0 bg-liquid-surface" />
-          <div className="absolute left-[-12%] top-[-8%] h-64 w-64 rounded-full bg-liquid-highlight blur-3xl" />
-          <div className="absolute bottom-[12%] right-[-10%] h-72 w-72 rounded-full bg-liquid-shadow blur-3xl" />
-          <div className="absolute inset-0 bg-background/70 backdrop-blur-3xl" />
-        </div>
         <div className="max-w-md mx-auto relative h-full overflow-y-auto overflow-x-hidden">
         <Routes>
           <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
