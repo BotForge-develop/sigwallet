@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Keyboard } from '@capacitor/keyboard';
+import { Capacitor } from '@capacitor/core';
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -10,6 +12,22 @@ const Auth = () => {
   const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    if (Capacitor.isNativePlatform()) {
+      const showListener = Keyboard.addListener('keyboardWillShow', () => {
+        setKeyboardVisible(true);
+      });
+      const hideListener = Keyboard.addListener('keyboardWillHide', () => {
+        setKeyboardVisible(false);
+      });
+      return () => {
+        showListener.then(l => l.remove());
+        hideListener.then(l => l.remove());
+      };
+    }
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,7 +58,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6">
+    <div className={`min-h-screen flex flex-col items-center px-6 transition-all duration-300 ${keyboardVisible ? 'justify-start pt-12' : 'justify-center'}`}>
       {/* Logo */}
       <motion.div
         className="mb-12 text-center"
