@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { User, Session } from '@supabase/supabase-js';
 import { isBiometricEnabled } from '@/lib/biometrics';
@@ -25,13 +25,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const biometricGateEnabled = Capacitor.isNativePlatform() && isBiometricEnabled();
+  const isLockedRef = useRef(biometricGateEnabled);
 
   useEffect(() => {
     let mounted = true;
 
     // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
+
+      if (biometricGateEnabled && isLockedRef.current && event === 'INITIAL_SESSION') {
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
+      }
+
+      if (event === 'SIGNED_IN') {
+        isLockedRef.current = false;
+      }
+
+      if (event === 'SIGNED_OUT') {
+        isLockedRef.current = biometricGateEnabled;
+      }
+
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
@@ -39,8 +57,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     // Then check for existing session
     const initializeAuth = async () => {
-      if (Capacitor.isNativePlatform() && isBiometricEnabled()) {
-        await supabase.auth.signOut({ scope: 'local' });
+      if (biometricGateEnabled) {
+        isLockedRef.current = true;
+        await supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
+        if (!mounted) return;
+
+        setSession(null);
+        setUser(null);
+        setLoading(false);
+        return;
       }
 
       const { data: { session } } = await supabase.auth.getSession();
@@ -57,6 +82,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (Capacitor.isNativePlatform()) {
       const listener = CapApp.addListener('appStateChange', ({ isActive }) => {
         if (!isActive && isBiometricEnabled()) {
+          isLockedRef.current = true;
           void supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
           setUser(null);
           setSession(null);
@@ -73,7 +99,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       mounted = false;
       subscription.unsubscribe();
     };
-  }, []);
+  }, [biometricGateEnabled]);
 
   const signOut = async () => {
     await supabase.auth.signOut();

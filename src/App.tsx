@@ -16,7 +16,6 @@ import Auth from "./pages/Auth";
 import WalletPage from "./pages/WalletPage";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
-import liquidGlassHero from "@/assets/apple-liquid-glass-hero.png";
 
 const queryClient = new QueryClient();
 
@@ -48,15 +47,10 @@ const AppRoutes = () => {
   return (
       <div className="fixed inset-0 overflow-hidden bg-background">
         <div className="pointer-events-none absolute inset-0">
-          <div
-            className="absolute inset-0 opacity-20"
-            style={{
-              backgroundImage: `url(${liquidGlassHero})`,
-              backgroundPosition: 'center',
-              backgroundSize: 'cover',
-            }}
-          />
-          <div className="absolute inset-0 bg-background/80 backdrop-blur-2xl" />
+          <div className="absolute inset-0 bg-liquid-surface" />
+          <div className="absolute left-[-12%] top-[-8%] h-64 w-64 rounded-full bg-liquid-highlight blur-3xl" />
+          <div className="absolute bottom-[12%] right-[-10%] h-72 w-72 rounded-full bg-liquid-shadow blur-3xl" />
+          <div className="absolute inset-0 bg-background/70 backdrop-blur-3xl" />
         </div>
         <div className="max-w-md mx-auto relative h-full overflow-y-auto overflow-x-hidden">
         <Routes>
