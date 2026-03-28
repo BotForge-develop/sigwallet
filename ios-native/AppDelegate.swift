@@ -38,10 +38,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         tabBarController.viewControllers = controllers
         tabBarController.delegate = self
 
-        // WICHTIG: Auf iOS 26+ KEINE Appearance setzen — Liquid Glass ist automatisch!
-        // Nur auf älteren iOS-Versionen ein custom Appearance verwenden.
+        // iOS 26+: Do NOT set any appearance or tint — Liquid Glass is automatic
+        // iOS <26: Use a custom blur appearance
         if #available(iOS 26.0, *) {
-            // Nichts tun — Liquid Glass wird automatisch angewendet
+            // Liquid Glass is automatic — do NOT touch appearance, tintColor,
+            // or unselectedItemTintColor here, as it can suppress the glass effect
         } else {
             let appearance = UITabBarAppearance()
             appearance.configureWithDefaultBackground()
@@ -50,10 +51,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             appearance.shadowColor = UIColor.clear
             tabBarController.tabBar.standardAppearance = appearance
             tabBarController.tabBar.scrollEdgeAppearance = appearance
+            tabBarController.tabBar.tintColor = UIColor(red: 0.93, green: 0.91, blue: 0.78, alpha: 1.0)
+            tabBarController.tabBar.unselectedItemTintColor = UIColor.secondaryLabel
         }
 
-        tabBarController.tabBar.tintColor = UIColor(red: 0.93, green: 0.91, blue: 0.78, alpha: 1.0)
-        tabBarController.tabBar.unselectedItemTintColor = UIColor.secondaryLabel
         tabBarController.tabBar.isHidden = true
 
         window = UIWindow(frame: UIScreen.main.bounds)
@@ -71,7 +72,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return true
     }
 
-    // MARK: - Route Sync (NUR über JavaScript — NICHT über webView.url!)
+    // MARK: - Route Sync
 
     private func waitForBridgeAndSetupRouting() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
@@ -117,7 +118,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
           window.addEventListener("popstate", reportRoute);
           window.addEventListener("nativeRouteRefresh", reportRoute);
 
-          // Initial report nach kurzer Verzögerung (warten bis React Router geladen)
           setTimeout(reportRoute, 300);
           setTimeout(reportRoute, 1000);
           setTimeout(reportRoute, 2000);
@@ -129,12 +129,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         webView.evaluateJavaScript(script, completionHandler: nil)
     }
 
-    // MARK: - Route anwenden
+    // MARK: - Route Apply
 
     private func applyRoute(_ route: String) {
         let normalizedRoute = route.isEmpty ? "/" : route
 
-        // Nur updaten wenn sich die Route tatsächlich geändert hat
         guard normalizedRoute != lastKnownRoute else { return }
         lastKnownRoute = normalizedRoute
 
@@ -176,7 +175,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationWillEnterForeground(_ application: UIApplication) {}
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Route nochmal abfragen wenn App wieder aktiv wird
         bridgeVC.bridge?.webView?.evaluateJavaScript(
             "window.dispatchEvent(new Event('nativeRouteRefresh'));",
             completionHandler: nil
@@ -224,7 +222,7 @@ extension AppDelegate: UITabBarControllerDelegate {
     }
 }
 
-// MARK: - JS Message Handler (einzige Route-Quelle!)
+// MARK: - JS Message Handler
 
 extension AppDelegate: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
