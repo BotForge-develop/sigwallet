@@ -20,47 +20,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         bridgeVC = CAPBridgeViewController()
         tabBarController = UITabBarController()
 
-        let tabs: [(String, String)] = [
-            ("Home", "house.fill"),
-            ("Transfer", "arrow.left.arrow.right"),
-            ("Chat", "message.fill"),
-            ("Profile", "person.fill")
-        ]
+        // Use the LiquidGlassTabBar setup (iOS 26 UITab API + fallback)
+        LiquidGlassTabBarSetup.configure(tabBarController: tabBarController)
 
-        var controllers: [UIViewController] = []
-        for (index, tab) in tabs.enumerated() {
-            let vc = UIViewController()
-            vc.view.backgroundColor = .clear
-            vc.tabBarItem = UITabBarItem(title: tab.0, image: UIImage(systemName: tab.1), tag: index)
-            controllers.append(vc)
-        }
-
-        tabBarController.viewControllers = controllers
         tabBarController.delegate = self
-
-        // iOS 26+: Do NOT set any appearance or tint — Liquid Glass is automatic
-        // iOS <26: Use a custom blur appearance
-        if #available(iOS 26.0, *) {
-            // Liquid Glass is automatic — do NOT touch appearance, tintColor,
-            // or unselectedItemTintColor here, as it can suppress the glass effect
-        } else {
-            let appearance = UITabBarAppearance()
-            appearance.configureWithDefaultBackground()
-            appearance.backgroundEffect = UIBlurEffect(style: .systemUltraThinMaterial)
-            appearance.backgroundColor = UIColor.clear
-            appearance.shadowColor = UIColor.clear
-            tabBarController.tabBar.standardAppearance = appearance
-            tabBarController.tabBar.scrollEdgeAppearance = appearance
-            tabBarController.tabBar.tintColor = UIColor(red: 0.93, green: 0.91, blue: 0.78, alpha: 1.0)
-            tabBarController.tabBar.unselectedItemTintColor = UIColor.secondaryLabel
-        }
-
-        tabBarController.tabBar.isHidden = true
+        tabBarController.tabBar.isHidden = true // Hidden until user logs in
 
         window = UIWindow(frame: UIScreen.main.bounds)
         window?.rootViewController = tabBarController
         window?.makeKeyAndVisible()
 
+        // Add Capacitor WebView below the tab bar
         tabBarController.addChild(bridgeVC)
         bridgeVC.view.frame = tabBarController.view.bounds
         bridgeVC.view.autoresizingMask = [.flexibleWidth, .flexibleHeight]
@@ -145,16 +115,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
         guard !isAuth else { return }
 
-        let tabRoutes = ["/", "/transfer", "/chat", "/profile"]
-        for (index, tabRoute) in tabRoutes.enumerated() {
-            if tabRoute == "/" && normalizedRoute == "/" {
-                tabBarController.selectedIndex = index
-                return
-            }
-            if tabRoute != "/" && normalizedRoute.hasPrefix(tabRoute) {
-                tabBarController.selectedIndex = index
-                return
-            }
+        if let index = LiquidGlassTabBarSetup.tabIndex(for: normalizedRoute) {
+            tabBarController.selectedIndex = index
         }
     }
 
@@ -208,9 +170,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
 extension AppDelegate: UITabBarControllerDelegate {
     func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
-        let routes = ["/", "/transfer", "/chat", "/profile"]
         let index = viewController.tabBarItem.tag
-        let route = routes[index]
+        let route = LiquidGlassTabBarSetup.route(for: index)
 
         bridgeVC.bridge?.webView?.evaluateJavaScript("""
         window.dispatchEvent(new CustomEvent('nativeTabChange', { detail: '\(route)' }));
