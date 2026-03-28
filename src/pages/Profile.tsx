@@ -1,13 +1,21 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Link, Palette, Shield, ChevronRight, LogOut, Plus, Check, X } from 'lucide-react';
+import { User, Link, Palette, Shield, ChevronRight, LogOut, Plus, Check, X, ScanFace } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useContacts } from '@/hooks/useContacts';
 import { toast } from 'sonner';
+import { Capacitor } from '@capacitor/core';
+import { supabase } from '@/integrations/supabase/client';
+import {
+  deleteCredentials,
+  isBiometricAvailable,
+  isBiometricEnabled,
+  saveCredentials,
+} from '@/lib/biometrics';
 
 const Profile = () => {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const { profile, updateProfile } = useProfile();
   const { contacts, addContact } = useContacts();
   const [showAddContact, setShowAddContact] = useState(false);
@@ -15,6 +23,11 @@ const Profile = () => {
   const [newIban, setNewIban] = useState('');
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [showBiometricSetup, setShowBiometricSetup] = useState(false);
+  const [biometricPassword, setBiometricPassword] = useState('');
+  const [biometricSaving, setBiometricSaving] = useState(false);
+  const biometricSupported = useMemo(() => Capacitor.getPlatform() === 'ios', []);
+  const biometricActive = biometricSupported && isBiometricEnabled();
 
   const startEdit = (field: string, currentValue: string) => {
     setEditingField(field);
@@ -42,6 +55,53 @@ const Profile = () => {
     setNewName('');
     setNewIban('');
     setShowAddContact(false);
+  };
+
+  const handleOpenBiometricSetup = async () => {
+    const available = await isBiometricAvailable();
+    if (!available) {
+      toast.error('Face ID ist auf diesem Gerät aktuell nicht verfügbar.');
+      return;
+    }
+    setShowBiometricSetup(true);
+  };
+
+  const handleEnableBiometric = async () => {
+    if (!user?.email) {
+      toast.error('Keine E-Mail für diesen Account gefunden.');
+      return;
+    }
+
+    if (!biometricPassword.trim()) {
+      toast.error('Bitte gib dein Passwort ein.');
+      return;
+    }
+
+    setBiometricSaving(true);
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: biometricPassword,
+      });
+
+      if (error) throw error;
+
+      await saveCredentials(user.email, biometricPassword);
+      setShowBiometricSetup(false);
+      setBiometricPassword('');
+      toast.success('Face ID ist jetzt aktiviert.');
+    } catch (error: any) {
+      toast.error(error.message || 'Face ID konnte nicht aktiviert werden.');
+    } finally {
+      setBiometricSaving(false);
+    }
+  };
+
+  const handleDisableBiometric = async () => {
+    await deleteCredentials();
+    setShowBiometricSetup(false);
+    setBiometricPassword('');
+    toast.success('Face ID wurde deaktiviert.');
   };
 
   const settingsGroups = [
@@ -143,6 +203,83 @@ const Profile = () => {
         </div>
       </motion.div>
 
+      {biometricSupported && (
+        <motion.div
+          className="mb-6"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.18 }}
+        >
+          <p className="text-xs text-muted-foreground uppercase tracking-widest mb-2 px-1">
+            Security
+          </p>
+          <div className="glass rounded-2xl overflow-hidden">
+            <button
+              type="button"
+              className="w-full flex items-center gap-3 p-4 text-left"
+              onClick={biometricActive ? handleDisableBiometric : handleOpenBiometricSetup}
+            >
+              <div className="w-9 h-9 rounded-xl glass flex items-center justify-center flex-shrink-0">
+                <ScanFace size={16} className="text-muted-foreground" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-foreground">Face ID</p>
+                <p className="text-xs text-muted-foreground">
+                  {biometricActive ? 'Aktiviert für schnellen Login' : 'Aktiviere Login ohne Passwort-Eingabe'}
+                </p>
+              </div>
+              <span className="text-xs font-medium text-beige">
+                {biometricActive ? 'An' : 'Aus'}
+              </span>
+            </button>
+
+            <AnimatePresence initial={false}>
+              {showBiometricSetup && !biometricActive && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="border-t border-border"
+                >
+                  <div className="p-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      Gib einmal dein Passwort ein, damit Face ID sicher für diesen Account gespeichert wird.
+                    </p>
+                    <input
+                      type="password"
+                      className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground outline-none glass rounded-xl px-4 h-11"
+                      placeholder="Passwort bestätigen"
+                      value={biometricPassword}
+                      onChange={(e) => setBiometricPassword(e.target.value)}
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        className="flex-1 h-11 rounded-xl gradient-beige text-primary-foreground font-semibold text-sm"
+                        onClick={handleEnableBiometric}
+                        disabled={biometricSaving}
+                      >
+                        {biometricSaving ? 'Aktiviere…' : 'Face ID aktivieren'}
+                      </button>
+                      <button
+                        type="button"
+                        className="h-11 px-4 rounded-xl glass text-sm text-foreground"
+                        onClick={() => {
+                          setShowBiometricSetup(false);
+                          setBiometricPassword('');
+                        }}
+                      >
+                        Abbrechen
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </motion.div>
+      )}
+
       {/* Settings */}
       {settingsGroups.map((group, gi) => (
         <motion.div
@@ -175,7 +312,7 @@ const Profile = () => {
                       onChange={(e) => setEditValue(e.target.value)}
                       onKeyDown={(e) => e.key === 'Enter' && saveEdit()}
                     />
-                    <button onClick={saveEdit} className="text-green-400"><Check size={16} /></button>
+                    <button onClick={saveEdit} className="text-beige"><Check size={16} /></button>
                     <button onClick={() => setEditingField(null)} className="text-muted-foreground"><X size={16} /></button>
                   </motion.div>
                 ) : (
