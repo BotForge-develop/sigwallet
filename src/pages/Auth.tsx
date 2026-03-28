@@ -58,7 +58,7 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6">
+    <div className={`min-h-screen flex flex-col items-center px-6 transition-all duration-300 ${keyboardVisible ? 'justify-start pt-12' : 'justify-center'}`}>
       {/* Logo */}
       <motion.div
         className="mb-12 text-center"
