@@ -27,36 +27,52 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let mounted = true;
+
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
     });
 
     // Then check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const initializeAuth = async () => {
+      if (Capacitor.isNativePlatform() && isBiometricEnabled()) {
+        await supabase.auth.signOut({ scope: 'local' });
+      }
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!mounted) return;
+
       setSession(session);
       setUser(session?.user ?? null);
       setLoading(false);
-    });
+    };
+
+    void initializeAuth();
 
     // Lock app when it goes to background (banking behavior)
     if (Capacitor.isNativePlatform()) {
       const listener = CapApp.addListener('appStateChange', ({ isActive }) => {
         if (!isActive && isBiometricEnabled()) {
-          // App went to background — clear session so user must re-auth
+          void supabase.auth.signOut({ scope: 'local' }).catch(() => undefined);
           setUser(null);
           setSession(null);
         }
       });
       return () => {
+        mounted = false;
         subscription.unsubscribe();
         listener.then(l => l.remove());
       };
     }
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signOut = async () => {
