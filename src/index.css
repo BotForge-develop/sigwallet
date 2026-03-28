@@ -57,6 +57,16 @@
 @layer base {
   * {
     @apply border-border;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+  }
+
+  /* Allow selection only inside actual text inputs */
+  input, textarea, [contenteditable="true"] {
+    -webkit-user-select: text;
+    user-select: text;
   }
 
   html,
@@ -66,6 +76,8 @@
     max-height: 100dvh;
     overflow: hidden;
     overscroll-behavior-y: none;
+    position: fixed;
+    width: 100%;
   }
 
   body {
