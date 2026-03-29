@@ -14,6 +14,7 @@ import ChatDetail from "./pages/ChatDetail";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import WalletPage from "./pages/WalletPage";
+import ReceiveCrypto from "./pages/ReceiveCrypto";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 
