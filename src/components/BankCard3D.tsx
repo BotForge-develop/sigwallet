@@ -137,14 +137,40 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
           className="absolute inset-0 rounded-2xl metallic-sheen flex flex-col justify-between"
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
         >
-          <div className="w-full h-10 bg-foreground/20 mt-5" />
-          <div className="px-5 flex items-center gap-3">
-            <div className="flex-1 h-7 rounded bg-foreground/10" />
-            <div className="bg-foreground/10 rounded px-2.5 py-1">
-              <p className="text-foreground/50 text-xs font-mono tracking-widest">•••</p>
+          {/* Magnetic Stripe */}
+          <div className="w-full h-12 bg-foreground/30 mt-6" />
+
+          {/* Signature Strip + CVV */}
+          <div className="px-5 mt-3 flex items-center gap-3">
+            <div className="flex-1">
+              <p className="text-foreground/20 text-[7px] mb-0.5">AUTHORIZED SIGNATURE</p>
+              <div className="h-8 rounded bg-foreground/5 border border-foreground/10 flex items-center px-2">
+                <p className="text-foreground/30 text-[10px] italic font-medium tracking-wide">{holderName}</p>
+              </div>
+            </div>
+            <div>
+              <p className="text-foreground/20 text-[7px] mb-0.5">CVV</p>
+              <div className="bg-foreground/10 rounded px-3 py-1.5 border border-foreground/10">
+                <p className={`text-xs font-mono tracking-widest transition-all duration-300 ${showNumber ? 'text-foreground/70' : 'text-foreground/50'}`}>
+                  {showNumber ? '847' : '•••'}
+                </p>
+              </div>
             </div>
           </div>
-          <div className="px-5 pb-3">
+
+          {/* Card Info */}
+          <div className="px-5 pb-3 mt-auto">
+            <div className="flex items-center justify-between mb-1.5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-5 rounded-sm bg-foreground/10 flex items-center justify-center">
+                  <p className="text-foreground/30 text-[6px] font-bold">VISA</p>
+                </div>
+                <div className="w-8 h-5 rounded-sm bg-foreground/10 flex items-center justify-center">
+                  <p className="text-foreground/30 text-[6px] font-bold">DEBIT</p>
+                </div>
+              </div>
+              <p className="text-foreground/20 text-[7px] font-mono">BLZ 672 300 00</p>
+            </div>
             <div>
               <p className="text-foreground/40 text-[9px] font-medium tracking-wider">{holderName}</p>
               <p className="text-foreground/20 text-[7px] leading-relaxed mt-0.5">
