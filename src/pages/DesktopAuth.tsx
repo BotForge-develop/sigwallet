@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Monitor, Smartphone, Check, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { QRCodeSVG } from 'qrcode.react';
 import AppleParticleCloud from '@/components/AppleParticleCloud';
 
 type PairingStatus = 'generating' | 'waiting' | 'approved' | 'error' | 'expired';
@@ -20,7 +21,7 @@ const DesktopAuth = () => {
     const { data, error: insertError } = await supabase
       .from('pairing_sessions')
       .insert({ status: 'pending' })
-      .select('session_token, pairing_code')
+      .select('session_token')
       .single();
 
     if (insertError || !data) {
@@ -80,6 +81,11 @@ const DesktopAuth = () => {
     };
   }, [sessionToken, status, navigate]);
 
+  // QR data encoded behind the particle animation
+  const qrData = sessionToken
+    ? JSON.stringify({ type: 'sigwallet_pair', token: sessionToken })
+    : '';
+
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
       <motion.div
@@ -108,9 +114,21 @@ const DesktopAuth = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-3 my-2"
+              className="flex flex-col items-center gap-3 my-2 relative"
             >
-              <AppleParticleCloud active={true} size={220} />
+              {/* Hidden QR code behind particles — camera can still read it */}
+              <div className="absolute inset-0 flex items-center justify-center z-0 opacity-[0.03]">
+                <QRCodeSVG
+                  value={qrData}
+                  size={180}
+                  bgColor="transparent"
+                  fgColor="white"
+                  level="M"
+                />
+              </div>
+              <div className="relative z-10">
+                <AppleParticleCloud active={true} size={220} />
+              </div>
               <p className="text-foreground/25 text-[11px]">
                 Warte auf Verbindung…
               </p>
