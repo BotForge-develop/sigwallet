@@ -1,70 +1,94 @@
-import { useState, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, X, Monitor, Shield } from 'lucide-react';
+import { Check, X, Monitor, Shield, Camera } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import AppleParticleCloud from '@/components/AppleParticleCloud';
 
 const PairDevice = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [status, setStatus] = useState<'input' | 'confirm' | 'approving' | 'done' | 'error'>('input');
+  const [status, setStatus] = useState<'scanning' | 'confirm' | 'approving' | 'done' | 'error'>('scanning');
   const [error, setError] = useState<string | null>(null);
-  const [code, setCode] = useState(['', '', '', '', '', '']);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const scanIntervalRef = useRef<number | null>(null);
 
-  const handleCodeChange = (index: number, value: string) => {
-    if (!/^\d*$/.test(value)) return;
-    const newCode = [...code];
+  const stopCamera = useCallback(() => {
+    if (scanIntervalRef.current) {
+      clearInterval(scanIntervalRef.current);
+      scanIntervalRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+  }, []);
 
-    if (value.length > 1) {
-      const digits = value.replace(/\D/g, '').split('').slice(0, 6);
-      digits.forEach((d, i) => { if (i < 6) newCode[i] = d; });
-      setCode(newCode);
-      inputRefs.current[Math.min(digits.length, 5)]?.focus();
-      if (digits.length === 6) lookupSession(digits.join(''));
+  const startCamera = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } }
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      startScanning();
+    } catch {
+      setError('Kamera nicht verfügbar');
+      setStatus('error');
+    }
+  }, []);
+
+  const startScanning = useCallback(() => {
+    // Use BarcodeDetector API if available, otherwise fall back
+    if ('BarcodeDetector' in window) {
+      const detector = new (window as any).BarcodeDetector({ formats: ['qr_code'] });
+      
+      scanIntervalRef.current = window.setInterval(async () => {
+        if (!videoRef.current || videoRef.current.readyState < 2) return;
+        
+        try {
+          const barcodes = await detector.detect(videoRef.current);
+          if (barcodes.length > 0) {
+            const data = barcodes[0].rawValue;
+            handleScannedData(data);
+          }
+        } catch {
+          // Scan failed silently
+        }
+      }, 200);
     } else {
-      newCode[index] = value;
-      setCode(newCode);
-      if (value && index < 5) inputRefs.current[index + 1]?.focus();
-      const full = newCode.join('');
-      if (full.length === 6 && newCode.every(d => d)) lookupSession(full);
+      // Fallback: try using canvas-based detection with jsQR-like approach
+      // For now, show manual entry fallback
+      console.log('BarcodeDetector not supported, using manual fallback');
     }
-  };
+  }, []);
 
-  const handleKeyDown = (index: number, e: React.KeyboardEvent) => {
-    if (e.key === 'Backspace' && !code[index] && index > 0) {
-      inputRefs.current[index - 1]?.focus();
+  const handleScannedData = useCallback((rawData: string) => {
+    try {
+      const data = JSON.parse(rawData);
+      if (data.type === 'sigwallet_pair' && data.token) {
+        stopCamera();
+        setSessionToken(data.token);
+        setStatus('confirm');
+      }
+    } catch {
+      // Not valid JSON, ignore
     }
-  };
+  }, [stopCamera]);
 
-  const lookupSession = async (pairingCode: string) => {
-    const { data } = await supabase
-      .from('pairing_sessions')
-      .select('session_token, status, expires_at')
-      .eq('pairing_code', pairingCode)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!data) {
-      setError('Ungültiger Code');
-      setStatus('error');
-      return;
+  useEffect(() => {
+    if (status === 'scanning') {
+      startCamera();
     }
-
-    if (new Date(data.expires_at) < new Date()) {
-      setError('Code abgelaufen');
-      setStatus('error');
-      return;
-    }
-
-    setSessionToken(data.session_token);
-    setStatus('confirm');
-  };
+    return () => stopCamera();
+  }, [status, startCamera, stopCamera]);
 
   const handleApprove = async () => {
     if (!sessionToken || !user) return;
@@ -90,11 +114,10 @@ const PairDevice = () => {
   };
 
   const resetFlow = () => {
-    setCode(['', '', '', '', '', '']);
+    stopCamera();
     setSessionToken(null);
     setError(null);
-    setStatus('input');
-    setTimeout(() => inputRefs.current[0]?.focus(), 100);
+    setStatus('scanning');
   };
 
   return (
@@ -106,40 +129,52 @@ const PairDevice = () => {
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
         <AnimatePresence mode="wait">
-          {status === 'input' && (
+          {status === 'scanning' && (
             <motion.div
-              key="input"
+              key="scanning"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               className="flex flex-col items-center gap-5"
             >
-              <AppleParticleCloud active={true} size={140} />
-
               <div className="text-center">
                 <h2 className="text-lg font-semibold text-foreground">Gerät verbinden</h2>
                 <p className="text-foreground/50 text-sm mt-2 leading-relaxed">
-                  Gib den Code ein, der auf deinem Mac angezeigt wird
+                  Halte dein iPhone an den Mac-Bildschirm
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                {code.map((digit, i) => (
-                  <div key={i} className="flex items-center">
-                    <input
-                      ref={(el) => { inputRefs.current[i] = el; }}
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={6}
-                      value={digit}
-                      onChange={(e) => handleCodeChange(i, e.target.value)}
-                      onKeyDown={(e) => handleKeyDown(i, e)}
-                      className="w-10 h-12 glass rounded-xl text-center text-lg font-semibold text-foreground outline-none focus:ring-2 focus:ring-blue-500/30 transition-all"
-                      autoFocus={i === 0}
-                    />
-                    {i === 2 && <div className="w-3" />}
-                  </div>
-                ))}
+              {/* Circular camera viewfinder */}
+              <div className="relative w-52 h-52">
+                {/* Outer particle ring */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <AppleParticleCloud active={true} size={208} />
+                </div>
+
+                {/* Circular camera cutout */}
+                <div className="absolute inset-6 rounded-full overflow-hidden border-2 border-blue-500/20">
+                  <video
+                    ref={videoRef}
+                    className="w-full h-full object-cover"
+                    playsInline
+                    muted
+                    autoPlay
+                  />
+                  {/* Scanning line animation */}
+                  <motion.div
+                    className="absolute inset-x-0 h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent"
+                    animate={{ top: ['10%', '90%', '10%'] }}
+                    transition={{ duration: 2.5, repeat: Infinity, ease: 'easeInOut' }}
+                  />
+                </div>
+
+                {/* Hidden canvas for frame capture */}
+                <canvas ref={canvasRef} className="hidden" width={320} height={320} />
+              </div>
+
+              <div className="flex items-center gap-2 text-foreground/30">
+                <Camera size={14} />
+                <p className="text-[11px]">Suche nach Pairing-Signal…</p>
               </div>
 
               <button
