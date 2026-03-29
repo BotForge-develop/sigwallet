@@ -130,6 +130,11 @@ struct SigWalletWebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            // Clear cache to ensure latest version loads
+            WKWebsiteDataStore.default().removeData(
+                ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache],
+                modifiedSince: Date(timeIntervalSince1970: 0)
+            ) {}
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 self.parent.isLoading = false
             }
