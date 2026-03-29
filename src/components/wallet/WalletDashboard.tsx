@@ -40,7 +40,7 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
   const [balances, setBalances] = useState<Record<CoinType, string | null>>({ eth: null, btc: null, ltc: null });
   const [loading, setLoading] = useState<Record<CoinType, boolean>>({ eth: false, btc: false, ltc: false });
 
-  // Derive all addresses on mount & save to localStorage
+  // Derive all addresses on mount & save to localStorage + DB
   useEffect(() => {
     if (!mnemonic) return;
     const derived: Record<CoinType, string> = { eth: '', btc: '', ltc: '' };
@@ -53,7 +53,20 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
     }
     setAddresses(derived);
     saveWalletAddresses(derived);
-  }, [mnemonic]);
+
+    // Sync to DB for receive-by-ID
+    if (user?.id) {
+      for (const coin of COINS) {
+        if (!derived[coin.id]) continue;
+        supabase.from('wallet_addresses').upsert(
+          { user_id: user.id, coin: coin.id, address: derived[coin.id], updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,coin' }
+        ).then(({ error }) => {
+          if (error) console.error(`Failed to sync ${coin.id} address:`, error);
+        });
+      }
+    }
+  }, [mnemonic, user?.id]);
 
   const refreshBalance = async (coin: CoinType) => {
     const addr = addresses[coin];
