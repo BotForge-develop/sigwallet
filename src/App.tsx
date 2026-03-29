@@ -16,6 +16,8 @@ import Auth from "./pages/Auth";
 import WalletPage from "./pages/WalletPage";
 import ReceiveCrypto from "./pages/ReceiveCrypto";
 import AllTransactions from "./pages/AllTransactions";
+import DesktopAuth from "./pages/DesktopAuth";
+import PairDevice from "./pages/PairDevice";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 
