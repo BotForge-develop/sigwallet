@@ -3,7 +3,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Monitor, Smartphone, Check, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { QRCodeSVG } from 'qrcode.react';
 import AppleParticleCloud from '@/components/AppleParticleCloud';
 
 type PairingStatus = 'generating' | 'waiting' | 'approved' | 'error' | 'expired';
@@ -11,6 +10,7 @@ type PairingStatus = 'generating' | 'waiting' | 'approved' | 'error' | 'expired'
 const DesktopAuth = () => {
   const [status, setStatus] = useState<PairingStatus>('generating');
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -21,7 +21,7 @@ const DesktopAuth = () => {
     const { data, error: insertError } = await supabase
       .from('pairing_sessions')
       .insert({ status: 'pending' })
-      .select('session_token')
+      .select('session_token, pairing_code')
       .single();
 
     if (insertError || !data) {
@@ -31,6 +31,7 @@ const DesktopAuth = () => {
     }
 
     setSessionToken(data.session_token);
+    setPairingCode(parseInt((data as any).pairing_code, 10));
     setStatus('waiting');
   }, []);
 
@@ -81,11 +82,6 @@ const DesktopAuth = () => {
     };
   }, [sessionToken, status, navigate]);
 
-  // QR data encoded behind the particle animation
-  const qrData = sessionToken
-    ? JSON.stringify({ type: 'sigwallet_pair', token: sessionToken })
-    : '';
-
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
       <motion.div
@@ -108,27 +104,16 @@ const DesktopAuth = () => {
         </p>
 
         <AnimatePresence mode="wait">
-          {status === 'waiting' && sessionToken && (
+          {status === 'waiting' && pairingCode != null && (
             <motion.div
               key="waiting"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-3 my-2 relative"
+              className="flex flex-col items-center gap-3 my-2"
             >
-              {/* Hidden QR code behind particles — camera can still read it */}
-              <div className="absolute inset-0 flex items-center justify-center z-0 opacity-[0.03]">
-                <QRCodeSVG
-                  value={qrData}
-                  size={180}
-                  bgColor="transparent"
-                  fgColor="white"
-                  level="M"
-                />
-              </div>
-              <div className="relative z-10">
-                <AppleParticleCloud active={true} size={220} />
-              </div>
+              {/* The pairing code is encoded INTO the dot positions */}
+              <AppleParticleCloud active={true} size={240} pairingCode={pairingCode} />
               <p className="text-foreground/25 text-[11px]">
                 Warte auf Verbindung…
               </p>
@@ -143,7 +128,7 @@ const DesktopAuth = () => {
               exit={{ opacity: 0 }}
               className="my-8 flex flex-col items-center gap-4"
             >
-              <AppleParticleCloud active={false} size={220} />
+              <AppleParticleCloud active={false} size={240} />
               <RefreshCw className="text-foreground/30 animate-spin" size={20} />
             </motion.div>
           )}
@@ -164,7 +149,7 @@ const DesktopAuth = () => {
 
           {(status === 'expired' || status === 'error') && (
             <motion.div
-              key="expired"
+              key="error"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="my-8 flex flex-col items-center gap-4"
