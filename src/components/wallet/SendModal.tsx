@@ -23,7 +23,6 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl, usdPrice }: SendModa
 
   const coinInfo = COINS.find(c => c.id === coin)!;
 
-  // Convert between USD and crypto
   const converted = useMemo(() => {
     const val = parseFloat(amount) || 0;
     if (!usdPrice || usdPrice === 0) return { crypto: val.toString(), usd: '0' };
@@ -51,12 +50,7 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl, usdPrice }: SendModa
   };
 
   const handleClose = () => {
-    setTo('');
-    setAmount('');
-    setStatus('idle');
-    setTxHash('');
-    setExplorerUrl('');
-    setError('');
+    setTo(''); setAmount(''); setStatus('idle'); setTxHash(''); setExplorerUrl(''); setError('');
     onClose();
   };
 
@@ -67,7 +61,7 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl, usdPrice }: SendModa
       {open && (
         <>
           <motion.div
-            className="fixed inset-0 bg-background/80 backdrop-blur-sm z-[60]"
+            className="fixed inset-0 bg-background/60 backdrop-blur-2xl z-[60]"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -80,8 +74,8 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl, usdPrice }: SendModa
             exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
           >
-            <div className="glass-strong rounded-t-3xl p-6 safe-bottom">
-              <div className="flex items-center justify-between mb-6">
+            <div className="glass-liquid rounded-t-3xl p-6 safe-bottom border-0">
+              <div className="flex items-center justify-between mb-5">
                 <h3 className="text-lg font-semibold text-foreground flex items-center gap-2">
                   <span className="text-xl">{coinInfo.icon}</span>
                   Send {coinInfo.symbol}
@@ -93,28 +87,23 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl, usdPrice }: SendModa
 
               {status === 'idle' && (
                 <>
-                  {/* Recipient */}
-                  <div className="mb-4">
-                    <label className="text-xs text-muted-foreground mb-1.5 block">Recipient Address</label>
+                  <div className="mb-3">
+                    <label className="text-[10px] text-muted-foreground mb-1 block uppercase tracking-wider">Recipient</label>
                     <input
-                      className="w-full h-12 rounded-xl glass px-4 text-sm text-foreground placeholder:text-muted-foreground bg-transparent outline-none font-mono"
+                      className="w-full h-11 rounded-xl glass px-4 text-sm text-foreground placeholder:text-muted-foreground bg-transparent outline-none font-mono backdrop-blur-xl"
                       placeholder={placeholder}
                       value={to}
                       onChange={(e) => setTo(e.target.value)}
                     />
                   </div>
 
-                  {/* Amount with USD/Crypto toggle */}
                   <div className="mb-4">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-xs text-muted-foreground">Amount</label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[10px] text-muted-foreground uppercase tracking-wider">Amount</label>
                       {usdPrice && (
                         <button
                           className="flex items-center gap-1 text-[10px] text-beige font-medium px-2 py-0.5 rounded-lg glass"
-                          onClick={() => {
-                            setInputMode(prev => prev === 'usd' ? 'crypto' : 'usd');
-                            setAmount('');
-                          }}
+                          onClick={() => { setInputMode(prev => prev === 'usd' ? 'crypto' : 'usd'); setAmount(''); }}
                         >
                           {inputMode === 'usd' ? <DollarSign size={10} /> : <Coins size={10} />}
                           {inputMode === 'usd' ? 'USD' : coinInfo.symbol}
@@ -124,79 +113,54 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl, usdPrice }: SendModa
                     <div className="relative">
                       <input
                         type="number"
-                        className="w-full h-12 rounded-xl glass px-4 pr-16 text-sm text-foreground placeholder:text-muted-foreground bg-transparent outline-none"
+                        className="w-full h-11 rounded-xl glass px-4 pr-16 text-sm text-foreground placeholder:text-muted-foreground bg-transparent outline-none backdrop-blur-xl"
                         placeholder={inputMode === 'usd' ? '0.00' : '0.0'}
                         value={amount}
                         onChange={(e) => setAmount(e.target.value)}
                         step={inputMode === 'usd' ? '0.01' : coin === 'eth' ? '0.001' : '0.00000001'}
                       />
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs text-muted-foreground font-medium">
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-muted-foreground font-medium">
                         {inputMode === 'usd' ? 'USD' : coinInfo.symbol}
                       </span>
                     </div>
 
-                    {/* Conversion display */}
                     {usdPrice && amount && parseFloat(amount) > 0 && (
-                      <motion.p
-                        className="text-xs text-muted-foreground mt-2 text-center"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                      >
-                        {inputMode === 'usd' ? (
-                          <>≈ {parseFloat(converted.crypto).toFixed(6)} {coinInfo.symbol}</>
-                        ) : (
-                          <>≈ ${converted.usd}</>
-                        )}
+                      <motion.p className="text-[10px] text-muted-foreground mt-1.5 text-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                        {inputMode === 'usd' ? <>≈ {parseFloat(converted.crypto).toFixed(6)} {coinInfo.symbol}</> : <>≈ ${converted.usd}</>}
                       </motion.p>
                     )}
                   </div>
 
-                  {coin !== 'eth' && (
-                    <p className="text-xs text-muted-foreground mb-4 text-center">
-                      Signed locally & broadcast via BlockCypher
-                    </p>
-                  )}
-
                   <motion.button
-                    className="w-full h-14 rounded-2xl gradient-beige text-primary-foreground font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
+                    className="w-full h-12 rounded-2xl gradient-beige text-primary-foreground font-semibold text-sm flex items-center justify-center gap-2 disabled:opacity-40"
                     whileTap={{ scale: 0.97 }}
                     onClick={handleSend}
                     disabled={!to || !amount || parseFloat(amount) <= 0}
                   >
-                    <Send size={18} />
-                    Send {cryptoAmount && parseFloat(cryptoAmount) > 0
-                      ? `${parseFloat(cryptoAmount).toFixed(6)} ${coinInfo.symbol}`
-                      : coinInfo.symbol}
-                    {inputMode === 'usd' && amount && ` ($${parseFloat(amount).toFixed(2)})`}
+                    <Send size={16} />
+                    Send {cryptoAmount && parseFloat(cryptoAmount) > 0 ? `${parseFloat(cryptoAmount).toFixed(6)} ${coinInfo.symbol}` : coinInfo.symbol}
                   </motion.button>
                 </>
               )}
 
               {status === 'signing' && (
                 <div className="flex flex-col items-center py-8">
-                  <Loader2 size={40} className="text-beige animate-spin mb-4" />
-                  <p className="text-foreground font-medium">Signing transaction...</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {coin === 'eth' ? 'Broadcasting to network' : 'Creating & signing UTXO transaction'}
-                  </p>
+                  <Loader2 size={36} className="text-beige animate-spin mb-4" />
+                  <p className="text-foreground font-medium text-sm">Signing transaction...</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{coin === 'eth' ? 'Broadcasting to network' : 'Creating UTXO transaction'}</p>
                 </div>
               )}
 
               {status === 'sent' && (
                 <div className="flex flex-col items-center py-8">
                   <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 200 }}>
-                    <CheckCircle size={48} className="text-success mb-4" />
+                    <CheckCircle size={44} className="text-success mb-4" />
                   </motion.div>
-                  <p className="text-foreground font-medium mb-2">Transaction Sent!</p>
-                  <p className="text-xs text-muted-foreground font-mono break-all text-center px-4 mb-4">{txHash}</p>
+                  <p className="text-foreground font-medium text-sm mb-2">Transaction Sent!</p>
+                  <p className="text-[10px] text-muted-foreground font-mono break-all text-center px-4 mb-4">{txHash}</p>
                   {explorerUrl && (
-                    <motion.button
-                      className="h-10 px-5 rounded-xl glass text-sm text-foreground flex items-center gap-2"
-                      whileTap={{ scale: 0.97 }}
-                      onClick={() => window.open(explorerUrl, '_blank')}
-                    >
-                      <ExternalLink size={14} />
-                      View on Explorer
+                    <motion.button className="h-9 px-4 rounded-xl glass text-xs text-foreground flex items-center gap-2" whileTap={{ scale: 0.97 }} onClick={() => window.open(explorerUrl, '_blank')}>
+                      <ExternalLink size={12} /> Explorer
                     </motion.button>
                   )}
                 </div>
@@ -204,14 +168,10 @@ const SendModal = ({ open, onClose, mnemonic, coin, rpcUrl, usdPrice }: SendModa
 
               {status === 'error' && (
                 <div className="flex flex-col items-center py-8">
-                  <AlertCircle size={48} className="text-destructive mb-4" />
-                  <p className="text-foreground font-medium mb-2">Failed</p>
-                  <p className="text-xs text-destructive/80 text-center px-4">{error}</p>
-                  <motion.button
-                    className="mt-4 h-10 px-6 rounded-xl glass text-sm text-foreground"
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => setStatus('idle')}
-                  >
+                  <AlertCircle size={44} className="text-destructive mb-4" />
+                  <p className="text-foreground font-medium text-sm mb-2">Failed</p>
+                  <p className="text-[10px] text-destructive/80 text-center px-4">{error}</p>
+                  <motion.button className="mt-4 h-9 px-5 rounded-xl glass text-xs text-foreground" whileTap={{ scale: 0.97 }} onClick={() => setStatus('idle')}>
                     Try Again
                   </motion.button>
                 </div>
