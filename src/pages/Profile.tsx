@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Link, Shield, ChevronRight, LogOut, Plus, Check, X, ScanFace, Bell, Globe } from 'lucide-react';
+import { User, Link, Shield, ChevronRight, LogOut, Plus, Check, X, ScanFace, Bell, Globe, Monitor } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useContacts } from '@/hooks/useContacts';
