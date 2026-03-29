@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, Check, Send, RefreshCw, Wallet, ExternalLink, Zap } from 'lucide-react';
+import { Copy, Check, Send, RefreshCw, Wallet, ExternalLink, Zap, Share2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import SendModal from './SendModal';
 import BuyCryptoModal from './BuyCryptoModal';
 import { saveWalletAddresses } from '@/hooks/useWalletAddresses';
 import { useCryptoPrices } from '@/hooks/useCryptoPrices';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import {
   COINS,
   CoinType,
