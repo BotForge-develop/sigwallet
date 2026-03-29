@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Camera } from '@capacitor/camera';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Check, X, Monitor, Shield, Camera } from 'lucide-react';
+import { Check, X, Monitor, Shield, Camera as CameraIcon } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { decodePattern } from '@/lib/patternCodec';
 import AppleParticleCloud from '@/components/AppleParticleCloud';
@@ -13,7 +15,6 @@ const PairDevice = () => {
   const [status, setStatus] = useState<'scanning' | 'confirm' | 'approving' | 'done' | 'error'>('scanning');
   const [error, setError] = useState<string | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const [decodedCode, setDecodedCode] = useState<number | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -25,9 +26,14 @@ const PairDevice = () => {
       clearInterval(scanIntervalRef.current);
       scanIntervalRef.current = null;
     }
+
     if (streamRef.current) {
-      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
+    }
+
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
   }, []);
 
@@ -38,7 +44,7 @@ const PairDevice = () => {
     const codeStr = code.toString().padStart(6, '0');
     const { data } = await supabase
       .from('pairing_sessions')
-      .select('session_token, status, expires_at')
+      .select('session_token, expires_at')
       .eq('pairing_code', codeStr)
       .eq('status', 'pending')
       .order('created_at', { ascending: false })
@@ -47,19 +53,18 @@ const PairDevice = () => {
 
     if (!data) {
       decodedRef.current = false;
-      return; // Keep scanning
+      return;
     }
 
     if (new Date(data.expires_at) < new Date()) {
+      stopCamera();
       setError('Pairing abgelaufen');
       setStatus('error');
-      stopCamera();
       return;
     }
 
     stopCamera();
     setSessionToken(data.session_token);
-    setDecodedCode(code);
     setStatus('confirm');
   }, [stopCamera]);
 
@@ -68,59 +73,98 @@ const PairDevice = () => {
     const video = videoRef.current;
     if (!canvas || !video) return;
 
-    const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    if (!ctx) {
+      setError('Scanner konnte nicht gestartet werden');
+      setStatus('error');
+      return;
+    }
+
     const scanSize = 320;
     canvas.width = scanSize;
     canvas.height = scanSize;
 
-    // Buffer for stable detection (require 2 consecutive same reads)
     let lastCode: number | null = null;
     let confirmCount = 0;
 
     scanIntervalRef.current = window.setInterval(() => {
       if (video.readyState < 2 || decodedRef.current) return;
 
-      // Draw video frame to canvas (center crop square)
       const vw = video.videoWidth;
       const vh = video.videoHeight;
+      if (!vw || !vh) return;
+
       const cropSize = Math.min(vw, vh);
       const sx = (vw - cropSize) / 2;
       const sy = (vh - cropSize) / 2;
-      ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, scanSize, scanSize);
 
+      ctx.drawImage(video, sx, sy, cropSize, cropSize, 0, 0, scanSize, scanSize);
       const imageData = ctx.getImageData(0, 0, scanSize, scanSize);
       const code = decodePattern(imageData, scanSize, scanSize);
 
-      if (code !== null) {
-        if (code === lastCode) {
-          confirmCount++;
-          if (confirmCount >= 2) {
-            lookupByCode(code);
-          }
-        } else {
-          lastCode = code;
-          confirmCount = 1;
-        }
-      } else {
+      if (code === null) {
         lastCode = null;
         confirmCount = 0;
+        return;
       }
-    }, 250); // Scan 4 times per second
+
+      if (code === lastCode) {
+        confirmCount += 1;
+        if (confirmCount >= 2) {
+          lookupByCode(code);
+        }
+      } else {
+        lastCode = code;
+        confirmCount = 1;
+      }
+    }, 250);
   }, [lookupByCode]);
 
   const startCamera = useCallback(async () => {
+    setError(null);
+
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 640 } }
-      });
-      streamRef.current = stream;
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadeddata = () => startScanning();
-        await videoRef.current.play();
+      if (Capacitor.isNativePlatform()) {
+        const permission = await Camera.requestPermissions({ permissions: ['camera'] });
+        if (permission.camera !== 'granted' && permission.camera !== 'limited') {
+          setError('Bitte erlaube den Kamerazugriff in iOS und starte dann erneut.');
+          setStatus('error');
+          return;
+        }
       }
-    } catch {
-      setError('Kamera nicht verfügbar');
+
+      if (!navigator.mediaDevices?.getUserMedia) {
+        setError('Kamera-API ist in dieser App-Version noch nicht verfügbar. Bitte npx cap sync ios ausführen und die App neu bauen.');
+        setStatus('error');
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 1280 },
+        },
+        audio: false,
+      });
+
+      streamRef.current = stream;
+
+      if (!videoRef.current) {
+        setError('Kameravorschau konnte nicht initialisiert werden');
+        setStatus('error');
+        return;
+      }
+
+      videoRef.current.srcObject = stream;
+      videoRef.current.setAttribute('playsinline', 'true');
+      videoRef.current.muted = true;
+
+      await videoRef.current.play();
+      window.setTimeout(startScanning, 300);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '';
+      setError(message || 'Kamera nicht verfügbar');
       setStatus('error');
     }
   }, [startScanning]);
@@ -130,6 +174,7 @@ const PairDevice = () => {
       decodedRef.current = false;
       startCamera();
     }
+
     return () => stopCamera();
   }, [status, startCamera, stopCamera]);
 
@@ -159,7 +204,6 @@ const PairDevice = () => {
   const resetFlow = () => {
     stopCamera();
     setSessionToken(null);
-    setDecodedCode(null);
     setError(null);
     decodedRef.current = false;
     setStatus('scanning');
@@ -189,15 +233,12 @@ const PairDevice = () => {
                 </p>
               </div>
 
-              {/* Circular camera viewfinder with particle ring */}
               <div className="relative w-56 h-56">
-                {/* Particle ring around the camera */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <AppleParticleCloud active={true} size={224} />
                 </div>
 
-                {/* Circular camera */}
-                <div className="absolute inset-7 rounded-full overflow-hidden border border-blue-500/20 shadow-[0_0_30px_rgba(59,130,246,0.15)]">
+                <div className="absolute inset-7 rounded-full overflow-hidden border border-primary/20 bg-background shadow-lg">
                   <video
                     ref={videoRef}
                     className="w-full h-full object-cover scale-[1.2]"
@@ -205,20 +246,18 @@ const PairDevice = () => {
                     muted
                     autoPlay
                   />
-                  {/* Scanning pulse */}
                   <motion.div
-                    className="absolute inset-0 rounded-full border-2 border-blue-400/30"
+                    className="absolute inset-0 rounded-full border border-primary/30"
                     animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.6, 0.3] }}
                     transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                   />
                 </div>
 
-                {/* Hidden processing canvas */}
                 <canvas ref={canvasRef} className="hidden" />
               </div>
 
               <div className="flex items-center gap-2 text-foreground/30">
-                <Camera size={14} />
+                <CameraIcon size={14} />
                 <p className="text-[11px]">Suche nach Pairing-Signal…</p>
               </div>
 
@@ -247,52 +286,84 @@ const PairDevice = () => {
               >
                 <Monitor className="text-foreground/60" size={28} />
               </motion.div>
+
               <div className="text-center">
                 <h2 className="text-lg font-semibold text-foreground">Gerät erkannt!</h2>
                 <p className="text-foreground/50 text-sm mt-2">
-                  macOS-Gerät möchte sich verbinden.
+                  Ein macOS-Gerät möchte sich verbinden.
                 </p>
               </div>
+
               <div className="glass rounded-xl px-4 py-3 flex items-center gap-3 w-full">
-                <Shield className="text-beige/60 shrink-0" size={16} />
+                <Shield className="text-foreground/50 shrink-0" size={16} />
                 <p className="text-foreground/40 text-[11px] leading-relaxed">
                   Das Gerät erhält Zugriff auf dein Konto.
                 </p>
               </div>
+
               <div className="flex gap-3 w-full mt-2">
-                <button onClick={resetFlow} className="flex-1 glass rounded-xl py-3 flex items-center justify-center gap-2 text-foreground/50 text-sm">
-                  <X size={16} /> Ablehnen
+                <button
+                  onClick={resetFlow}
+                  className="flex-1 glass rounded-xl py-3 flex items-center justify-center gap-2 text-foreground/50 text-sm"
+                >
+                  <X size={16} />
+                  Ablehnen
                 </button>
-                <button onClick={handleApprove} className="flex-1 gradient-beige rounded-xl py-3 flex items-center justify-center gap-2 text-background text-sm font-medium">
-                  <Check size={16} /> Verbinden
+                <button
+                  onClick={handleApprove}
+                  className="flex-1 gradient-beige rounded-xl py-3 flex items-center justify-center gap-2 text-background text-sm font-medium"
+                >
+                  <Check size={16} />
+                  Verbinden
                 </button>
               </div>
             </motion.div>
           )}
 
           {status === 'approving' && (
-            <motion.div key="approving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-8 flex flex-col items-center gap-4">
-              <div className="w-10 h-10 border-2 border-beige/30 border-t-beige rounded-full animate-spin" />
+            <motion.div
+              key="approving"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="py-8 flex flex-col items-center gap-4"
+            >
+              <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
               <p className="text-foreground/50 text-sm">Verbinde...</p>
             </motion.div>
           )}
 
           {status === 'done' && (
-            <motion.div key="done" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} className="py-8 flex flex-col items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center">
-                <Check className="text-green-400" size={28} />
+            <motion.div
+              key="done"
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="py-8 flex flex-col items-center gap-4"
+            >
+              <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <Check className="text-primary" size={28} />
               </div>
               <p className="text-foreground/70 text-sm font-medium">Gerät verbunden!</p>
             </motion.div>
           )}
 
           {status === 'error' && (
-            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-8 flex flex-col items-center gap-4">
+            <motion.div
+              key="error"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="py-8 flex flex-col items-center gap-4"
+            >
               <div className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center">
                 <X className="text-destructive" size={28} />
               </div>
-              <p className="text-foreground/50 text-sm">{error}</p>
-              <button onClick={resetFlow} className="glass rounded-xl px-6 py-2 text-sm text-foreground/50">Erneut versuchen</button>
+              <p className="text-foreground/50 text-sm text-center">{error}</p>
+              <button
+                onClick={resetFlow}
+                className="glass rounded-xl px-6 py-2 text-sm text-foreground/50"
+              >
+                Erneut versuchen
+              </button>
             </motion.div>
           )}
         </AnimatePresence>

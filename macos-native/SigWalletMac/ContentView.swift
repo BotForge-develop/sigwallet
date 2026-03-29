@@ -6,7 +6,6 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            // Liquid Glass background
             if #available(macOS 26.0, *) {
                 Color.clear
                     .background(.ultraThinMaterial)
@@ -24,6 +23,13 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: isLoading)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                if isLoading {
+                    isLoading = false
+                }
+            }
+        }
     }
 }
 
@@ -80,39 +86,46 @@ struct SigWalletWebView: NSViewRepresentable {
     func makeNSView(context: Context) -> WKWebView {
         let config = WKWebViewConfiguration()
         config.preferences.setValue(true, forKey: "developerExtrasEnabled")
+        config.defaultWebpagePreferences.allowsContentJavaScript = true
+        config.websiteDataStore = .default()
 
-        // Add route change handler for native tab sync
         config.userContentController.add(context.coordinator, name: "routeChange")
+        config.userContentController.add(context.coordinator, name: "pageReady")
 
-        // Inject CSS to hide the web bottom nav (native sidebar handles it)
-        let hideNavCSS = """
-        var style = document.createElement('style');
-        style.textContent = `
-            /* Hide web bottom nav on macOS */
-            nav[class*="BottomNav"], [class*="bottom-nav"] {
-                display: none !important;
-            }
-            /* Adjust body for macOS - no safe areas needed */
-            html, body, #root {
-                position: relative !important;
-                overflow: auto !important;
-            }
-        `;
-        document.head.appendChild(style);
+        let bootstrapScript = """
+        (function() {
+          var style = document.createElement('style');
+          style.textContent = `
+            nav[class*="BottomNav"], [class*="bottom-nav"] { display: none !important; }
+            html, body, #root { position: relative !important; overflow: auto !important; }
+          `;
+          document.head.appendChild(style);
+
+          function notifyReady() {
+            try { window.webkit.messageHandlers.pageReady.postMessage(window.location.pathname || '/'); } catch (e) {}
+          }
+
+          if (document.readyState === 'complete' || document.readyState === 'interactive') {
+            setTimeout(notifyReady, 150);
+          } else {
+            document.addEventListener('DOMContentLoaded', function() { setTimeout(notifyReady, 150); }, { once: true });
+          }
+          window.addEventListener('load', function() { setTimeout(notifyReady, 250); }, { once: true });
+        })();
         """
-        let userScript = WKUserScript(source: hideNavCSS, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
+        let userScript = WKUserScript(source: bootstrapScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
         config.userContentController.addUserScript(userScript)
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.navigationDelegate = context.coordinator
-        webView.setValue(false, forKey: "drawsBackground") // Transparent background
-
-        // Allow back/forward swipe gestures
+        webView.setValue(false, forKey: "drawsBackground")
         webView.allowsBackForwardNavigationGestures = true
 
-        // Load the published SigWallet app (use desktop-login route)
         if let url = URL(string: "https://sigwallet.lovable.app/desktop-login") {
-            webView.load(URLRequest(url: url))
+            var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.timeoutInterval = 20
+            webView.load(request)
         }
 
         return webView
@@ -129,13 +142,14 @@ struct SigWalletWebView: NSViewRepresentable {
             self.parent = parent
         }
 
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                self.parent.isLoading = false
+            }
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            // Clear cache to ensure latest version loads
-            WKWebsiteDataStore.default().removeData(
-                ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache],
-                modifiedSince: Date(timeIntervalSince1970: 0)
-            ) {}
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 self.parent.isLoading = false
             }
         }
@@ -144,9 +158,18 @@ struct SigWalletWebView: NSViewRepresentable {
             parent.isLoading = false
         }
 
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            parent.isLoading = false
+        }
+
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "routeChange", let route = message.body as? String {
                 print("[macOS] Route changed: \(route)")
+            }
+            if message.name == "pageReady" {
+                DispatchQueue.main.async {
+                    self.parent.isLoading = false
+                }
             }
         }
     }
