@@ -10,7 +10,6 @@ type PairingStatus = 'generating' | 'waiting' | 'approved' | 'error' | 'expired'
 const DesktopAuth = () => {
   const [status, setStatus] = useState<PairingStatus>('generating');
   const [sessionToken, setSessionToken] = useState<string | null>(null);
-  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -31,7 +30,6 @@ const DesktopAuth = () => {
     }
 
     setSessionToken(data.session_token);
-    setPairingCode((data as any).pairing_code);
     setStatus('waiting');
   }, []);
 
@@ -39,7 +37,6 @@ const DesktopAuth = () => {
     createPairingSession();
   }, [createPairingSession]);
 
-  // Subscribe to realtime changes
   useEffect(() => {
     if (!sessionToken || status !== 'waiting') return;
 
@@ -83,11 +80,6 @@ const DesktopAuth = () => {
     };
   }, [sessionToken, status, navigate]);
 
-  // Format code as "123 456"
-  const formattedCode = pairingCode
-    ? `${pairingCode.slice(0, 3)} ${pairingCode.slice(3)}`
-    : '';
-
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
       <motion.div
@@ -96,7 +88,6 @@ const DesktopAuth = () => {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
-        {/* Header */}
         <div className="flex items-center gap-3 mb-2">
           <Monitor className="text-foreground/60" size={20} />
           <span className="text-foreground/30 text-xs">•••</span>
@@ -107,47 +98,21 @@ const DesktopAuth = () => {
           Mit iPhone anmelden
         </h1>
         <p className="text-foreground/50 text-sm text-center leading-relaxed max-w-[280px]">
-          Öffne SigWallet auf deinem iPhone und verbinde dich über den Profil-Tab
+          Öffne SigWallet auf deinem iPhone und halte es an den Bildschirm
         </p>
 
-        {/* Particle Cloud + Code */}
         <AnimatePresence mode="wait">
-          {status === 'waiting' && pairingCode && (
+          {status === 'waiting' && sessionToken && (
             <motion.div
               key="waiting"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-5 my-2"
+              className="flex flex-col items-center gap-3 my-2"
             >
-              <AppleParticleCloud active={true} size={200} />
-              
-              {/* Pairing code */}
-              <motion.div
-                className="flex items-center gap-1"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-              >
-                {formattedCode.split('').map((char, i) => (
-                  <motion.span
-                    key={i}
-                    className={`${
-                      char === ' '
-                        ? 'w-3'
-                        : 'w-10 h-12 glass rounded-xl flex items-center justify-center text-xl font-semibold text-foreground tracking-widest'
-                    }`}
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: 0.4 + i * 0.05 }}
-                  >
-                    {char !== ' ' && char}
-                  </motion.span>
-                ))}
-              </motion.div>
-
-              <p className="text-foreground/30 text-[11px]">
-                Code läuft in 5 Minuten ab
+              <AppleParticleCloud active={true} size={220} />
+              <p className="text-foreground/25 text-[11px]">
+                Warte auf Verbindung…
               </p>
             </motion.div>
           )}
@@ -160,7 +125,7 @@ const DesktopAuth = () => {
               exit={{ opacity: 0 }}
               className="my-8 flex flex-col items-center gap-4"
             >
-              <AppleParticleCloud active={false} size={200} />
+              <AppleParticleCloud active={false} size={220} />
               <RefreshCw className="text-foreground/30 animate-spin" size={20} />
             </motion.div>
           )}
@@ -187,19 +152,18 @@ const DesktopAuth = () => {
               className="my-8 flex flex-col items-center gap-4"
             >
               <p className="text-foreground/50 text-sm">
-                {status === 'expired' ? 'Code abgelaufen' : error}
+                {status === 'expired' ? 'Verbindung abgelaufen' : error}
               </p>
               <button
                 onClick={createPairingSession}
                 className="glass rounded-xl px-6 py-2.5 text-sm text-foreground/70 hover:text-foreground transition-colors"
               >
-                Neuen Code generieren
+                Erneut versuchen
               </button>
             </motion.div>
           )}
         </AnimatePresence>
 
-        {/* Divider */}
         <div className="w-full flex items-center gap-3">
           <div className="flex-1 h-px bg-foreground/[0.06]" />
           <span className="text-foreground/20 text-[10px] tracking-widest uppercase">oder</span>
