@@ -1,11 +1,14 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Copy, Check, Send, RefreshCw, Wallet, ExternalLink, Zap } from 'lucide-react';
+import { Copy, Check, Send, RefreshCw, Wallet, ExternalLink, Zap, Share2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import SendModal from './SendModal';
 import BuyCryptoModal from './BuyCryptoModal';
 import { saveWalletAddresses } from '@/hooks/useWalletAddresses';
 import { useCryptoPrices } from '@/hooks/useCryptoPrices';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import {
   COINS,
   CoinType,
@@ -31,12 +34,13 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
   const [showSend, setShowSend] = useState(false);
   const [showBuy, setShowBuy] = useState(false);
   const { prices } = useCryptoPrices();
+  const { user } = useAuth();
 
   const [addresses, setAddresses] = useState<Record<CoinType, string>>({ eth: '', btc: '', ltc: '' });
   const [balances, setBalances] = useState<Record<CoinType, string | null>>({ eth: null, btc: null, ltc: null });
   const [loading, setLoading] = useState<Record<CoinType, boolean>>({ eth: false, btc: false, ltc: false });
 
-  // Derive all addresses on mount & save to localStorage
+  // Derive all addresses on mount & save to localStorage + DB
   useEffect(() => {
     if (!mnemonic) return;
     const derived: Record<CoinType, string> = { eth: '', btc: '', ltc: '' };
@@ -49,7 +53,20 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
     }
     setAddresses(derived);
     saveWalletAddresses(derived);
-  }, [mnemonic]);
+
+    // Sync to DB for receive-by-ID
+    if (user?.id) {
+      for (const coin of COINS) {
+        if (!derived[coin.id]) continue;
+        supabase.from('wallet_addresses').upsert(
+          { user_id: user.id, coin: coin.id, address: derived[coin.id], updated_at: new Date().toISOString() },
+          { onConflict: 'user_id,coin' }
+        ).then(({ error }) => {
+          if (error) console.error(`Failed to sync ${coin.id} address:`, error);
+        });
+      }
+    }
+  }, [mnemonic, user?.id]);
 
   const refreshBalance = async (coin: CoinType) => {
     const addr = addresses[coin];
@@ -166,29 +183,42 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
         </motion.div>
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <motion.button
-            className="flex-1 h-14 rounded-2xl gradient-beige text-primary-foreground font-semibold flex items-center justify-center gap-2"
+            className="flex-1 h-12 rounded-2xl gradient-beige text-primary-foreground font-semibold flex items-center justify-center gap-2 text-sm"
             whileTap={{ scale: 0.97 }}
             onClick={() => setShowSend(true)}
           >
-            <Send size={18} />
+            <Send size={16} />
             Send
           </motion.button>
           <motion.button
-            className="flex-1 h-14 rounded-2xl glass text-foreground font-semibold flex items-center justify-center gap-2"
+            className="flex-1 h-12 rounded-2xl glass text-foreground font-semibold flex items-center justify-center gap-2 text-sm"
             whileTap={{ scale: 0.97 }}
             onClick={() => setShowBuy(true)}
           >
-            <Zap size={18} className="text-beige" />
+            <Zap size={16} className="text-beige" />
             Buy
           </motion.button>
           <motion.button
-            className="h-14 w-14 rounded-2xl glass flex items-center justify-center"
+            className="flex-1 h-12 rounded-2xl glass text-foreground font-semibold flex items-center justify-center gap-2 text-sm"
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              if (!user?.id) return;
+              const url = `${window.location.origin}/receive?uid=${user.id}&coin=${selectedCoin}`;
+              navigator.clipboard.writeText(url);
+              toast.success('Empfangs-Link kopiert!');
+            }}
+          >
+            <Share2 size={16} className="text-beige" />
+            Share
+          </motion.button>
+          <motion.button
+            className="h-12 w-12 rounded-2xl glass flex items-center justify-center shrink-0"
             whileTap={{ scale: 0.97 }}
             onClick={() => window.open(getExplorerUrl(currentAddress, selectedCoin), '_blank')}
           >
-            <ExternalLink size={18} className="text-muted-foreground" />
+            <ExternalLink size={16} className="text-muted-foreground" />
           </motion.button>
         </div>
       </motion.div>

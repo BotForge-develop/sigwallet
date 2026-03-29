@@ -14,6 +14,7 @@ import ChatDetail from "./pages/ChatDetail";
 import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import WalletPage from "./pages/WalletPage";
+import ReceiveCrypto from "./pages/ReceiveCrypto";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 
@@ -90,6 +91,7 @@ const AppRoutes = () => {
           <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
           <Route path="/transfer" element={<ProtectedRoute><Transfer /></ProtectedRoute>} />
           <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
+          <Route path="/receive" element={<ReceiveCrypto />} />
           <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/chat/:contactId" element={<ProtectedRoute><ChatDetail /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
