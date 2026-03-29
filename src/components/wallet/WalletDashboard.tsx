@@ -34,6 +34,7 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
   const [showSend, setShowSend] = useState(false);
   const [showBuy, setShowBuy] = useState(false);
   const { prices } = useCryptoPrices();
+  const { user } = useAuth();
 
   const [addresses, setAddresses] = useState<Record<CoinType, string>>({ eth: '', btc: '', ltc: '' });
   const [balances, setBalances] = useState<Record<CoinType, string | null>>({ eth: null, btc: null, ltc: null });
