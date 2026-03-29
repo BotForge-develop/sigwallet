@@ -76,7 +76,7 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
     >
       <motion.div
         ref={cardRef}
-        className="relative w-full max-w-[320px] aspect-[1.586/1] rounded-2xl overflow-hidden cursor-grab active:cursor-grabbing select-none"
+        className="relative w-full max-w-[320px] aspect-[1.586/1] rounded-2xl cursor-grab active:cursor-grabbing select-none"
         style={{
           rotateX,
           rotateY,
@@ -134,23 +134,23 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
 
         {/* Back Face */}
         <div
-          className="absolute inset-0 rounded-2xl metallic-sheen flex flex-col justify-between"
+          className="absolute inset-0 rounded-2xl metallic-sheen flex flex-col"
           style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
         >
           {/* Magnetic Stripe */}
-          <div className="w-full h-12 bg-foreground/30 mt-6" />
+          <div className="w-full h-11 bg-foreground/30 mt-5" />
 
           {/* Signature Strip + CVV */}
-          <div className="px-5 mt-3 flex items-center gap-3">
+          <div className="px-4 mt-2.5 flex items-center gap-2.5">
             <div className="flex-1">
-              <p className="text-foreground/20 text-[7px] mb-0.5">AUTHORIZED SIGNATURE</p>
-              <div className="h-8 rounded bg-foreground/5 border border-foreground/10 flex items-center px-2">
-                <p className="text-foreground/30 text-[10px] italic font-medium tracking-wide">{holderName}</p>
+              <p className="text-foreground/20 text-[6px] mb-0.5">AUTHORIZED SIGNATURE</p>
+              <div className="h-7 rounded bg-foreground/5 border border-foreground/10 flex items-center px-2">
+                <p className="text-foreground/30 text-[9px] italic font-medium tracking-wide">{holderName}</p>
               </div>
             </div>
             <div>
-              <p className="text-foreground/20 text-[7px] mb-0.5">CVV</p>
-              <div className="bg-foreground/10 rounded px-3 py-1.5 border border-foreground/10">
+              <p className="text-foreground/20 text-[6px] mb-0.5">CVV</p>
+              <div className="bg-foreground/10 rounded px-2.5 py-1 border border-foreground/10">
                 <p className={`text-xs font-mono tracking-widest transition-all duration-300 ${showNumber ? 'text-foreground/70' : 'text-foreground/50'}`}>
                   {showNumber ? '847' : '•••'}
                 </p>
@@ -159,21 +159,21 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
           </div>
 
           {/* Card Info */}
-          <div className="px-5 pb-3 mt-auto">
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-5 rounded-sm bg-foreground/10 flex items-center justify-center">
-                  <p className="text-foreground/30 text-[6px] font-bold">VISA</p>
+          <div className="px-4 pb-2 mt-auto">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <div className="w-7 h-4 rounded-sm bg-foreground/10 flex items-center justify-center">
+                  <p className="text-foreground/30 text-[5px] font-bold">VISA</p>
                 </div>
-                <div className="w-8 h-5 rounded-sm bg-foreground/10 flex items-center justify-center">
-                  <p className="text-foreground/30 text-[6px] font-bold">DEBIT</p>
+                <div className="w-7 h-4 rounded-sm bg-foreground/10 flex items-center justify-center">
+                  <p className="text-foreground/30 text-[5px] font-bold">DEBIT</p>
                 </div>
               </div>
-              <p className="text-foreground/20 text-[7px] font-mono">BLZ 672 300 00</p>
+              <p className="text-foreground/20 text-[6px] font-mono">BLZ 672 300 00</p>
             </div>
             <div>
-              <p className="text-foreground/40 text-[9px] font-medium tracking-wider">{holderName}</p>
-              <p className="text-foreground/20 text-[7px] leading-relaxed mt-0.5">
+              <p className="text-foreground/40 text-[8px] font-medium tracking-wider">{holderName}</p>
+              <p className="text-foreground/20 text-[6px] leading-relaxed mt-0.5">
                 MLP Banking AG · Alte Heerstraße 40 · 69168 Wiesloch
               </p>
             </div>
