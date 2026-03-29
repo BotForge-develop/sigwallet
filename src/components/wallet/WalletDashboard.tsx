@@ -183,29 +183,42 @@ const WalletDashboard = ({ wallet, rpcUrl, mnemonic }: WalletDashboardProps) => 
         </motion.div>
 
         {/* Actions */}
-        <div className="flex gap-3">
+        <div className="flex gap-2">
           <motion.button
-            className="flex-1 h-14 rounded-2xl gradient-beige text-primary-foreground font-semibold flex items-center justify-center gap-2"
+            className="flex-1 h-12 rounded-2xl gradient-beige text-primary-foreground font-semibold flex items-center justify-center gap-2 text-sm"
             whileTap={{ scale: 0.97 }}
             onClick={() => setShowSend(true)}
           >
-            <Send size={18} />
+            <Send size={16} />
             Send
           </motion.button>
           <motion.button
-            className="flex-1 h-14 rounded-2xl glass text-foreground font-semibold flex items-center justify-center gap-2"
+            className="flex-1 h-12 rounded-2xl glass text-foreground font-semibold flex items-center justify-center gap-2 text-sm"
             whileTap={{ scale: 0.97 }}
             onClick={() => setShowBuy(true)}
           >
-            <Zap size={18} className="text-beige" />
+            <Zap size={16} className="text-beige" />
             Buy
           </motion.button>
           <motion.button
-            className="h-14 w-14 rounded-2xl glass flex items-center justify-center"
+            className="flex-1 h-12 rounded-2xl glass text-foreground font-semibold flex items-center justify-center gap-2 text-sm"
+            whileTap={{ scale: 0.97 }}
+            onClick={() => {
+              if (!user?.id) return;
+              const url = `${window.location.origin}/receive?uid=${user.id}&coin=${selectedCoin}`;
+              navigator.clipboard.writeText(url);
+              toast.success('Empfangs-Link kopiert!');
+            }}
+          >
+            <Share2 size={16} className="text-beige" />
+            Share
+          </motion.button>
+          <motion.button
+            className="h-12 w-12 rounded-2xl glass flex items-center justify-center shrink-0"
             whileTap={{ scale: 0.97 }}
             onClick={() => window.open(getExplorerUrl(currentAddress, selectedCoin), '_blank')}
           >
-            <ExternalLink size={18} className="text-muted-foreground" />
+            <ExternalLink size={16} className="text-muted-foreground" />
           </motion.button>
         </div>
       </motion.div>
