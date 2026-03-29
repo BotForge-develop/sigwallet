@@ -1,26 +1,52 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ethers } from 'ethers';
 import { Wallet, Plus, ArrowLeft } from 'lucide-react';
 import PinPad from '@/components/wallet/PinPad';
 import MnemonicDisplay from '@/components/wallet/MnemonicDisplay';
 import WalletDashboard from '@/components/wallet/WalletDashboard';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 type Step = 'landing' | 'create-pin' | 'confirm-pin' | 'show-mnemonic' | 'unlock' | 'dashboard';
 
 const RPC_URL = 'https://eth.llamarpc.com'; // free public RPC
 
 const WalletPage = () => {
+  const { user } = useAuth();
   const [step, setStep] = useState<Step>(() => {
-    return localStorage.getItem('wallet_enc') ? 'unlock' : 'landing';
+    return 'loading' as Step;
   });
   const [pin, setPin] = useState('');
   const [mnemonic, setMnemonic] = useState('');
   const [wallet, setWallet] = useState<ethers.HDNodeWallet | null>(null);
+  const [dbHasWallet, setDbHasWallet] = useState(false);
+
+  // Check if wallet exists in DB on mount
+  useEffect(() => {
+    if (!user?.id) { setStep('landing'); return; }
+    const check = async () => {
+      const { data } = await supabase
+        .from('encrypted_wallets')
+        .select('id')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data) {
+        setDbHasWallet(true);
+        setStep('unlock');
+      } else if (localStorage.getItem('wallet_enc')) {
+        // Legacy: has local wallet but not in DB yet
+        setStep('unlock');
+      } else {
+        setStep('landing');
+      }
+    };
+    check();
+  }, [user?.id]);
 
   // Encrypt and store
-  const encryptAndStore = useCallback(async (mnemonic: string, pin: string) => {
-    // Simple XOR-based encryption with PIN (for local use only)
+  const encryptAndStore = useCallback(async (mnemonic: string, pin: string, saveToDb = true) => {
     const encoder = new TextEncoder();
     const data = encoder.encode(mnemonic);
     const pinBytes = encoder.encode(pin.repeat(Math.ceil(data.length / pin.length)));
@@ -30,12 +56,25 @@ const WalletPage = () => {
     }
     const hex = Array.from(encrypted).map(b => b.toString(16).padStart(2, '0')).join('');
     localStorage.setItem('wallet_enc', hex);
-  }, []);
+
+    // Also store in DB for persistence across devices/sessions
+    if (saveToDb && user?.id) {
+      const { error } = await supabase
+        .from('encrypted_wallets')
+        .upsert(
+          { user_id: user.id, encrypted_mnemonic: hex, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+      if (error) {
+        console.error('Failed to store wallet in DB:', error);
+      } else {
+        setDbHasWallet(true);
+      }
+    }
+  }, [user?.id]);
 
   // Decrypt
-  const decryptWallet = useCallback((pin: string): string | null => {
-    const hex = localStorage.getItem('wallet_enc');
-    if (!hex) return null;
+  const decryptFromHex = useCallback((hex: string, pin: string): string | null => {
     const encrypted = new Uint8Array(hex.match(/.{2}/g)!.map(b => parseInt(b, 16)));
     const encoder = new TextEncoder();
     const pinBytes = encoder.encode(pin.repeat(Math.ceil(encrypted.length / pin.length)));
@@ -72,20 +111,44 @@ const WalletPage = () => {
     setStep('dashboard');
   };
 
-  const handleUnlock = (enteredPin: string) => {
-    const decrypted = decryptWallet(enteredPin);
-    if (!decrypted) {
+  const handleUnlock = async (enteredPin: string) => {
+    // Try local first, then DB
+    let hex = localStorage.getItem('wallet_enc');
+
+    if (!hex && user?.id) {
+      // Fetch from DB
+      const { data } = await supabase
+        .from('encrypted_wallets')
+        .select('encrypted_mnemonic')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (data?.encrypted_mnemonic) {
+        hex = data.encrypted_mnemonic;
+        // Cache locally
+        localStorage.setItem('wallet_enc', hex);
+      }
+    }
+
+    if (!hex) {
       setStep('landing');
       return;
     }
+
     try {
+      const decrypted = decryptFromHex(hex, enteredPin);
+      if (!decrypted) throw new Error('Empty');
       const hdWallet = ethers.HDNodeWallet.fromPhrase(decrypted);
       setWallet(hdWallet);
       setMnemonic(decrypted);
+
+      // If not in DB yet, migrate it
+      if (!dbHasWallet && user?.id) {
+        await encryptAndStore(decrypted, enteredPin, true);
+      }
+
       setStep('dashboard');
     } catch {
-      // Wrong PIN — decrypted gibberish
-      // Could add error state, for now just retry
+      toast.error('Falscher PIN');
       setStep('unlock');
     }
   };
@@ -107,6 +170,12 @@ const WalletPage = () => {
       </div>
 
       <AnimatePresence mode="wait">
+      {(step as string) === 'loading' && (
+        <div className="flex items-center justify-center pt-32">
+          <div className="w-8 h-8 rounded-full border-2 border-beige border-t-transparent animate-spin" />
+        </div>
+      )}
+
         {step === 'landing' && (
           <motion.div
             key="landing"

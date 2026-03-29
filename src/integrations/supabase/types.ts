@@ -82,6 +82,30 @@ export type Database = {
         }
         Relationships: []
       }
+      encrypted_wallets: {
+        Row: {
+          created_at: string
+          encrypted_mnemonic: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          encrypted_mnemonic: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          encrypted_mnemonic?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           api_endpoint_url: string | null
