@@ -103,7 +103,7 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
         {/* Front Face */}
         <div
           className="absolute inset-0 rounded-2xl metallic-sheen p-5 flex flex-col justify-between"
-          style={{ backfaceVisibility: 'hidden' }}
+          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' } as React.CSSProperties}
         >
           <motion.div
             className="absolute inset-0 pointer-events-none rounded-2xl"
@@ -215,7 +215,7 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
         {/* Back Face */}
         <div
           className="absolute inset-0 rounded-2xl metallic-sheen flex flex-col"
-          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' } as React.CSSProperties}
         >
           {/* Magnetic Stripe */}
           <div className="w-full h-11 bg-foreground/30 mt-5" />

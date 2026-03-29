@@ -106,6 +106,42 @@ export type Database = {
         }
         Relationships: []
       }
+      pairing_sessions: {
+        Row: {
+          access_token: string | null
+          created_at: string
+          device_name: string | null
+          expires_at: string
+          id: string
+          refresh_token: string | null
+          session_token: string
+          status: string
+          user_id: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          created_at?: string
+          device_name?: string | null
+          expires_at?: string
+          id?: string
+          refresh_token?: string | null
+          session_token?: string
+          status?: string
+          user_id?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          created_at?: string
+          device_name?: string | null
+          expires_at?: string
+          id?: string
+          refresh_token?: string | null
+          session_token?: string
+          status?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           api_endpoint_url: string | null

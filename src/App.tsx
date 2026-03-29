@@ -16,6 +16,8 @@ import Auth from "./pages/Auth";
 import WalletPage from "./pages/WalletPage";
 import ReceiveCrypto from "./pages/ReceiveCrypto";
 import AllTransactions from "./pages/AllTransactions";
+import DesktopAuth from "./pages/DesktopAuth";
+import PairDevice from "./pages/PairDevice";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 
@@ -96,8 +98,10 @@ const AppRoutes = () => {
           <Route path="/transactions" element={<ProtectedRoute><AllTransactions /></ProtectedRoute>} />
           <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/chat/:contactId" element={<ProtectedRoute><ChatDetail /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="*" element={<NotFound />} />
+              <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+              <Route path="/desktop-login" element={<DesktopAuth />} />
+              <Route path="/pair" element={<ProtectedRoute><PairDevice /></ProtectedRoute>} />
+              <Route path="*" element={<NotFound />} />
         </Routes>
         {user && <BottomNav />}
       </div>
