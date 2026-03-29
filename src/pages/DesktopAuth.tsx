@@ -1,101 +1,16 @@
 import { useState, useEffect, useCallback } from 'react';
-import { QRCodeSVG } from 'qrcode.react';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Monitor, Smartphone, Check, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import AppleParticleCloud from '@/components/AppleParticleCloud';
 
 type PairingStatus = 'generating' | 'waiting' | 'approved' | 'error' | 'expired';
-
-const FiberCircle = ({ active }: { active: boolean }) => {
-  const particles = Array.from({ length: 60 }, (_, i) => {
-    const angle = (i / 60) * Math.PI * 2;
-    const radius = 90;
-    return {
-      id: i,
-      cx: Math.cos(angle) * radius,
-      cy: Math.sin(angle) * radius,
-      length: 12 + Math.random() * 20,
-      angle: angle * (180 / Math.PI) + (Math.random() - 0.5) * 30,
-      delay: Math.random() * 2,
-      duration: 1.5 + Math.random() * 1.5,
-    };
-  });
-
-  return (
-    <div className="relative w-[240px] h-[240px] flex items-center justify-center">
-      <svg
-        viewBox="-130 -130 260 260"
-        className="absolute inset-0 w-full h-full"
-      >
-        <defs>
-          <linearGradient id="fiber-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="hsl(210, 100%, 60%)" />
-            <stop offset="50%" stopColor="hsl(200, 100%, 70%)" />
-            <stop offset="100%" stopColor="hsl(220, 100%, 55%)" />
-          </linearGradient>
-          <filter id="fiber-glow">
-            <feGaussianBlur stdDeviation="3" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
-        </defs>
-        {particles.map((p) => (
-          <motion.line
-            key={p.id}
-            x1={p.cx}
-            y1={p.cy}
-            x2={p.cx + Math.cos((p.angle * Math.PI) / 180) * p.length}
-            y2={p.cy + Math.sin((p.angle * Math.PI) / 180) * p.length}
-            stroke="url(#fiber-gradient)"
-            strokeWidth={1.5}
-            strokeLinecap="round"
-            filter="url(#fiber-glow)"
-            initial={{ opacity: 0.2, pathLength: 0.3 }}
-            animate={
-              active
-                ? {
-                    opacity: [0.2, 0.9, 0.2],
-                    pathLength: [0.3, 1, 0.3],
-                    strokeWidth: [1, 2.5, 1],
-                  }
-                : { opacity: 0.15, pathLength: 0.3 }
-            }
-            transition={{
-              duration: p.duration,
-              delay: p.delay,
-              repeat: Infinity,
-              ease: 'easeInOut',
-            }}
-          />
-        ))}
-        {/* Inner glow circle */}
-        <motion.circle
-          cx={0}
-          cy={0}
-          r={75}
-          fill="none"
-          stroke="hsl(210, 100%, 60%)"
-          strokeWidth={0.5}
-          opacity={0.3}
-          animate={active ? { opacity: [0.1, 0.4, 0.1], r: [73, 77, 73] } : {}}
-          transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      </svg>
-      {/* Center content */}
-      <div className="relative z-10 w-[150px] h-[150px] flex items-center justify-center">
-        <div className="absolute inset-0 rounded-full bg-background/80 backdrop-blur-xl border border-foreground/[0.08]" />
-        <div className="relative z-10">{/* QR goes here via children */}</div>
-      </div>
-    </div>
-  );
-};
 
 const DesktopAuth = () => {
   const [status, setStatus] = useState<PairingStatus>('generating');
   const [sessionToken, setSessionToken] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
@@ -106,7 +21,7 @@ const DesktopAuth = () => {
     const { data, error: insertError } = await supabase
       .from('pairing_sessions')
       .insert({ status: 'pending' })
-      .select('session_token')
+      .select('session_token, pairing_code')
       .single();
 
     if (insertError || !data) {
@@ -116,6 +31,7 @@ const DesktopAuth = () => {
     }
 
     setSessionToken(data.session_token);
+    setPairingCode((data as any).pairing_code);
     setStatus('waiting');
   }, []);
 
@@ -141,8 +57,6 @@ const DesktopAuth = () => {
           const updated = payload.new as any;
           if (updated.status === 'approved') {
             setStatus('approved');
-
-            // If we got tokens, set the session
             if (updated.access_token && updated.refresh_token) {
               const { error: sessionError } = await supabase.auth.setSession({
                 access_token: updated.access_token,
@@ -159,7 +73,6 @@ const DesktopAuth = () => {
       )
       .subscribe();
 
-    // Auto-expire after 5 minutes
     const timeout = setTimeout(() => {
       if (status === 'waiting') setStatus('expired');
     }, 5 * 60 * 1000);
@@ -170,17 +83,13 @@ const DesktopAuth = () => {
     };
   }, [sessionToken, status, navigate]);
 
-  const qrData = sessionToken
-    ? JSON.stringify({
-        type: 'sigwallet_pair',
-        token: sessionToken,
-        url: window.location.origin,
-      })
+  // Format code as "123 456"
+  const formattedCode = pairingCode
+    ? `${pairingCode.slice(0, 3)} ${pairingCode.slice(3)}`
     : '';
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-8">
-      {/* Liquid Glass container */}
       <motion.div
         className="glass-liquid rounded-3xl p-10 max-w-md w-full flex flex-col items-center gap-6"
         initial={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -198,31 +107,48 @@ const DesktopAuth = () => {
           Mit iPhone anmelden
         </h1>
         <p className="text-foreground/50 text-sm text-center leading-relaxed max-w-[280px]">
-          Scanne den QR-Code mit deiner SigWallet App auf dem iPhone
+          Öffne SigWallet auf deinem iPhone und verbinde dich über den Profil-Tab
         </p>
 
-        {/* QR Code with Fiber Circle */}
+        {/* Particle Cloud + Code */}
         <AnimatePresence mode="wait">
-          {status === 'waiting' && sessionToken && (
+          {status === 'waiting' && pairingCode && (
             <motion.div
-              key="qr"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.8 }}
-              className="my-4"
+              key="waiting"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="flex flex-col items-center gap-5 my-2"
             >
-              <FiberCircle active={true}>
-              </FiberCircle>
-              <div className="flex justify-center -mt-[195px] mb-[105px] relative z-20">
-                <QRCodeSVG
-                  value={qrData}
-                  size={110}
-                  bgColor="transparent"
-                  fgColor="hsl(45, 40%, 75%)"
-                  level="M"
-                  style={{ borderRadius: 8 }}
-                />
-              </div>
+              <AppleParticleCloud active={true} size={200} />
+              
+              {/* Pairing code */}
+              <motion.div
+                className="flex items-center gap-1"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                {formattedCode.split('').map((char, i) => (
+                  <motion.span
+                    key={i}
+                    className={`${
+                      char === ' '
+                        ? 'w-3'
+                        : 'w-10 h-12 glass rounded-xl flex items-center justify-center text-xl font-semibold text-foreground tracking-widest'
+                    }`}
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4 + i * 0.05 }}
+                  >
+                    {char !== ' ' && char}
+                  </motion.span>
+                ))}
+              </motion.div>
+
+              <p className="text-foreground/30 text-[11px]">
+                Code läuft in 5 Minuten ab
+              </p>
             </motion.div>
           )}
 
@@ -232,13 +158,10 @@ const DesktopAuth = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="my-4"
+              className="my-8 flex flex-col items-center gap-4"
             >
-              <FiberCircle active={false}>
-              </FiberCircle>
-              <div className="flex justify-center -mt-[195px] mb-[105px] relative z-20">
-                <RefreshCw className="text-foreground/30 animate-spin" size={24} />
-              </div>
+              <AppleParticleCloud active={false} size={200} />
+              <RefreshCw className="text-foreground/30 animate-spin" size={20} />
             </motion.div>
           )}
 
@@ -264,7 +187,7 @@ const DesktopAuth = () => {
               className="my-8 flex flex-col items-center gap-4"
             >
               <p className="text-foreground/50 text-sm">
-                {status === 'expired' ? 'QR-Code abgelaufen' : error}
+                {status === 'expired' ? 'Code abgelaufen' : error}
               </p>
               <button
                 onClick={createPairingSession}
@@ -283,7 +206,6 @@ const DesktopAuth = () => {
           <div className="flex-1 h-px bg-foreground/[0.06]" />
         </div>
 
-        {/* Fallback to regular login */}
         <button
           onClick={() => navigate('/auth')}
           className="text-foreground/40 text-sm hover:text-foreground/60 transition-colors"

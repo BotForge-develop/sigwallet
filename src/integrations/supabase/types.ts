@@ -113,6 +113,7 @@ export type Database = {
           device_name: string | null
           expires_at: string
           id: string
+          pairing_code: string | null
           refresh_token: string | null
           session_token: string
           status: string
@@ -124,6 +125,7 @@ export type Database = {
           device_name?: string | null
           expires_at?: string
           id?: string
+          pairing_code?: string | null
           refresh_token?: string | null
           session_token?: string
           status?: string
@@ -135,6 +137,7 @@ export type Database = {
           device_name?: string | null
           expires_at?: string
           id?: string
+          pairing_code?: string | null
           refresh_token?: string | null
           session_token?: string
           status?: string

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, Link, Shield, ChevronRight, LogOut, Plus, Check, X, ScanFace, Bell, Globe } from 'lucide-react';
+import { User, Link, Shield, ChevronRight, LogOut, Plus, Check, X, ScanFace, Bell, Globe, Monitor } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useProfile } from '@/hooks/useProfile';
 import { useContacts } from '@/hooks/useContacts';
@@ -18,6 +19,7 @@ import {
 
 const Profile = () => {
   const { signOut, user } = useAuth();
+  const navigate = useNavigate();
   const { profile, updateProfile } = useProfile();
   const { contacts, addContact } = useContacts();
   const [showAddContact, setShowAddContact] = useState(false);
@@ -215,6 +217,17 @@ const Profile = () => {
             </div>
             <Switch checked={darkMode} disabled />
           </div>
+          <button
+            className="w-full flex items-center gap-2.5 p-3 text-left"
+            onClick={() => navigate('/pair')}
+          >
+            <Monitor size={14} className="text-blue-400 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-foreground">Gerät verbinden</p>
+              <p className="text-[10px] text-muted-foreground">Mac mit iPhone koppeln</p>
+            </div>
+            <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+          </button>
         </div>
       </motion.div>
 
