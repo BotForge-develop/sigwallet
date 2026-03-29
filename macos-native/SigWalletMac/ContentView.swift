@@ -142,13 +142,14 @@ struct SigWalletWebView: NSViewRepresentable {
             self.parent = parent
         }
 
+        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
+                self.parent.isLoading = false
+            }
+        }
+
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            // Clear cache to ensure latest version loads
-            WKWebsiteDataStore.default().removeData(
-                ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache],
-                modifiedSince: Date(timeIntervalSince1970: 0)
-            ) {}
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                 self.parent.isLoading = false
             }
         }
@@ -157,9 +158,18 @@ struct SigWalletWebView: NSViewRepresentable {
             parent.isLoading = false
         }
 
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            parent.isLoading = false
+        }
+
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "routeChange", let route = message.body as? String {
                 print("[macOS] Route changed: \(route)")
+            }
+            if message.name == "pageReady" {
+                DispatchQueue.main.async {
+                    self.parent.isLoading = false
+                }
             }
         }
     }
