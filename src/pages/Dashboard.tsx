@@ -72,7 +72,12 @@ const Dashboard = () => {
 
       {/* 3D Card */}
       <motion.div initial={{ y: 15, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.05, duration: 0.4, type: 'spring' }}>
-        <BankCard3D last4="4291" />
+        <BankCard3D
+          last4="7678"
+          holderName={profile?.display_name || 'User'}
+          iban="DE80 6723 0000 0202 3376 78"
+        />
+        <p className="text-center text-[8px] text-muted-foreground mt-1">Halten für Kartennummer</p>
       </motion.div>
 
       {/* Balance */}
@@ -159,7 +164,7 @@ const Dashboard = () => {
       <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.25 }}>
         <div className="flex items-center justify-between mb-1.5">
           <p className="text-[10px] font-medium text-foreground">Letzte Transaktionen</p>
-          <button className="text-[8px] text-beige-muted">Alle</button>
+          <button className="text-[8px] text-beige-muted" onClick={() => navigate('/transactions')}>Alle →</button>
         </div>
         <div className="glass rounded-2xl px-2 divide-y divide-border">
           {loading ? (

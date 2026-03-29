@@ -15,6 +15,7 @@ import Profile from "./pages/Profile";
 import Auth from "./pages/Auth";
 import WalletPage from "./pages/WalletPage";
 import ReceiveCrypto from "./pages/ReceiveCrypto";
+import AllTransactions from "./pages/AllTransactions";
 import NotFound from "./pages/NotFound";
 import BottomNav from "./components/BottomNav";
 
@@ -92,6 +93,7 @@ const AppRoutes = () => {
           <Route path="/transfer" element={<ProtectedRoute><Transfer /></ProtectedRoute>} />
           <Route path="/wallet" element={<ProtectedRoute><WalletPage /></ProtectedRoute>} />
           <Route path="/receive" element={<ReceiveCrypto />} />
+          <Route path="/transactions" element={<ProtectedRoute><AllTransactions /></ProtectedRoute>} />
           <Route path="/chat" element={<ProtectedRoute><Chat /></ProtectedRoute>} />
           <Route path="/chat/:contactId" element={<ProtectedRoute><ChatDetail /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />

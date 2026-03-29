@@ -3,12 +3,17 @@ import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
 import { Wifi } from 'lucide-react';
 
 interface BankCard3DProps {
-  last4: string;
+  last4?: string;
+  cardNumber?: string;
+  holderName?: string;
+  iban?: string;
 }
 
-const BankCard3D = ({ last4 }: BankCard3DProps) => {
+const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: BankCard3DProps) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showNumber, setShowNumber] = useState(false);
+  const holdTimer = useRef<ReturnType<typeof setTimeout>>();
 
   const rawRotateX = useMotionValue(0);
   const rawRotateY = useMotionValue(0);
@@ -32,6 +37,7 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
       rotY: rawRotateY.get(),
     };
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    holdTimer.current = setTimeout(() => setShowNumber(true), 600);
   }, [rawRotateX, rawRotateY]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
@@ -46,6 +52,8 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    setShowNumber(false);
     const currentY = rawRotateY.get();
     const norm = ((currentY % 360) + 360) % 360;
 
@@ -58,6 +66,8 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
     }
     rawRotateX.set(0);
   }, [rawRotateX, rawRotateY]);
+
+  const revealNumber = cardNumber || '4291 7832 0551 7678';
 
   return (
     <div
@@ -95,8 +105,8 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
           />
           <div className="flex justify-between items-start relative z-10">
             <div>
-              <p className="text-foreground/60 text-[10px] font-medium tracking-[0.2em] uppercase">SimonDev</p>
-              <p className="text-beige text-xs font-semibold tracking-wider mt-0.5">BLACK</p>
+                <p className="text-foreground/60 text-[10px] font-medium tracking-[0.2em] uppercase">MLP Banking</p>
+                <p className="text-beige text-xs font-semibold tracking-wider mt-0.5">PRIVATE</p>
             </div>
             <Wifi className="text-foreground/30 rotate-90" size={18} />
           </div>
@@ -104,7 +114,16 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
             <div className="w-9 h-6 rounded-md gradient-beige opacity-80" />
           </div>
           <div className="flex justify-between items-end relative z-10">
-            <p className="text-foreground/50 text-xs font-light tracking-[0.25em]">•••• {last4}</p>
+              <div>
+                <p className={`text-foreground/50 text-xs font-light tracking-[0.2em] transition-all duration-300 ${showNumber ? 'text-foreground/80' : ''}`}>
+                  {showNumber ? revealNumber : `•••• •••• •••• ${last4}`}
+                </p>
+                {iban && (
+                  <p className={`text-foreground/30 text-[7px] tracking-wider mt-0.5 transition-opacity duration-300 ${showNumber ? 'opacity-100' : 'opacity-0'}`}>
+                    {iban}
+                  </p>
+                )}
+              </div>
             <div className="flex flex-col items-end">
               <p className="text-foreground/30 text-[8px] tracking-wider">VALID THRU</p>
               <p className="text-foreground/50 text-[11px]">12/29</p>
@@ -126,9 +145,12 @@ const BankCard3D = ({ last4 }: BankCard3DProps) => {
             </div>
           </div>
           <div className="px-5 pb-3">
-            <p className="text-foreground/20 text-[7px] leading-relaxed">
-              This card is property of SimonDev Private Banking. Unauthorized use is prohibited.
-            </p>
+            <div>
+              <p className="text-foreground/40 text-[9px] font-medium tracking-wider">{holderName}</p>
+              <p className="text-foreground/20 text-[7px] leading-relaxed mt-0.5">
+                MLP Banking AG · Alte Heerstraße 40 · 69168 Wiesloch
+              </p>
+            </div>
           </div>
           <div className="absolute inset-0 rounded-2xl border border-foreground/[0.06] pointer-events-none" />
         </div>
