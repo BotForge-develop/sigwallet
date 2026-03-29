@@ -1,5 +1,5 @@
-import { useRef, useState, useCallback } from 'react';
-import { motion, useMotionValue, useSpring, useTransform } from 'framer-motion';
+import { useRef, useState, useCallback, useMemo } from 'react';
+import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
 import { Wifi } from 'lucide-react';
 
 interface BankCard3DProps {
@@ -69,6 +69,17 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
 
   const revealNumber = cardNumber || '4291 7832 0551 7678';
 
+  // Generate random particle positions for the dissolve effect
+  const particles = useMemo(() => 
+    Array.from({ length: 20 }, (_, i) => ({
+      id: i,
+      x: Math.random() * 200 - 100,
+      y: Math.random() * 30 - 15,
+      scale: Math.random() * 0.5 + 0.3,
+      delay: Math.random() * 0.15,
+    })), []
+  );
+
   return (
     <div
       className="flex justify-center"
@@ -114,14 +125,83 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
             <div className="w-9 h-6 rounded-md gradient-beige opacity-80" />
           </div>
           <div className="flex justify-between items-end relative z-10">
-              <div>
-                <p className={`text-foreground/50 text-xs font-light tracking-[0.2em] transition-all duration-300 ${showNumber ? 'text-foreground/80' : ''}`}>
-                  {showNumber ? revealNumber : `•••• •••• •••• ${last4}`}
-                </p>
+              <div className="relative">
+                {/* Masked number (default) */}
+                <AnimatePresence mode="wait">
+                  {!showNumber ? (
+                    <motion.p
+                      key="masked"
+                      className="text-foreground/50 text-xs font-light tracking-[0.2em]"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.2 } }}
+                    >
+                      •••• •••• •••• {last4}
+                    </motion.p>
+                  ) : (
+                    <motion.div key="revealed" className="relative">
+                      {/* Fiber particles that scatter away */}
+                      {particles.map((p) => (
+                        <motion.span
+                          key={`particle-${p.id}`}
+                          className="absolute left-1/2 top-1/2 w-[3px] h-[3px] rounded-full bg-beige/60"
+                          initial={{ x: 0, y: 0, opacity: 0.8, scale: 1 }}
+                          animate={{
+                            x: p.x,
+                            y: p.y,
+                            opacity: 0,
+                            scale: p.scale,
+                          }}
+                          transition={{
+                            duration: 0.6,
+                            delay: p.delay,
+                            ease: 'easeOut',
+                          }}
+                        />
+                      ))}
+                      {/* Revealed number with staggered character fade-in */}
+                      <p className="text-foreground/80 text-xs font-light tracking-[0.2em] flex">
+                        {revealNumber.split('').map((char, i) => (
+                          <motion.span
+                            key={i}
+                            initial={{ opacity: 0, y: 6, filter: 'blur(6px)' }}
+                            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                            transition={{
+                              duration: 0.35,
+                              delay: 0.05 + i * 0.025,
+                              ease: [0.22, 1, 0.36, 1],
+                            }}
+                          >
+                            {char === ' ' ? '\u00A0' : char}
+                          </motion.span>
+                        ))}
+                      </p>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
                 {iban && (
-                  <p className={`text-foreground/30 text-[7px] tracking-wider mt-0.5 transition-opacity duration-300 ${showNumber ? 'opacity-100' : 'opacity-0'}`}>
-                    {iban}
-                  </p>
+                  <AnimatePresence>
+                    {showNumber && (
+                      <motion.p
+                        className="text-foreground/30 text-[7px] tracking-wider mt-0.5 flex"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        transition={{ delay: 0.3, duration: 0.4 }}
+                      >
+                        {iban.split('').map((char, i) => (
+                          <motion.span
+                            key={i}
+                            initial={{ opacity: 0, filter: 'blur(4px)' }}
+                            animate={{ opacity: 1, filter: 'blur(0px)' }}
+                            transition={{ duration: 0.3, delay: 0.3 + i * 0.015 }}
+                          >
+                            {char === ' ' ? '\u00A0' : char}
+                          </motion.span>
+                        ))}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
                 )}
               </div>
             <div className="flex flex-col items-end">
@@ -151,9 +231,33 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
             <div>
               <p className="text-foreground/20 text-[6px] mb-0.5">CVV</p>
               <div className="bg-foreground/10 rounded px-2.5 py-1 border border-foreground/10">
-                <p className={`text-xs font-mono tracking-widest transition-all duration-300 ${showNumber ? 'text-foreground/70' : 'text-foreground/50'}`}>
-                  {showNumber ? '847' : '•••'}
-                </p>
+                <AnimatePresence mode="wait">
+                  {!showNumber ? (
+                    <motion.p
+                      key="cvv-masked"
+                      className="text-foreground/50 text-xs font-mono tracking-widest"
+                      exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.15 } }}
+                    >
+                      •••
+                    </motion.p>
+                  ) : (
+                    <motion.p
+                      key="cvv-revealed"
+                      className="text-foreground/70 text-xs font-mono tracking-widest flex"
+                    >
+                      {'847'.split('').map((d, i) => (
+                        <motion.span
+                          key={i}
+                          initial={{ opacity: 0, y: 4, filter: 'blur(6px)' }}
+                          animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                          transition={{ duration: 0.3, delay: 0.2 + i * 0.08 }}
+                        >
+                          {d}
+                        </motion.span>
+                      ))}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </div>
