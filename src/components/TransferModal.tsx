@@ -15,7 +15,6 @@ interface TransferModalProps {
 const TransferModal = ({ isOpen, onClose, amount, recipientName, onSuccess }: TransferModalProps) => {
   const [state, setState] = useState<ModalState>('authenticating');
 
-  // Simulate the flow
   useState(() => {
     if (!isOpen) return;
     setState('authenticating');
@@ -40,15 +39,15 @@ const TransferModal = ({ isOpen, onClose, amount, recipientName, onSuccess }: Tr
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
         >
-          {/* Backdrop */}
+          {/* Liquid Glass Backdrop */}
           <motion.div
-            className="absolute inset-0 bg-background/80 backdrop-blur-xl"
+            className="absolute inset-0 bg-background/60 backdrop-blur-2xl"
             onClick={state === 'success' ? onClose : undefined}
           />
 
           {/* Content */}
           <motion.div
-            className="relative glass-strong rounded-3xl p-8 w-full max-w-sm text-center"
+            className="relative glass-liquid rounded-3xl p-8 w-full max-w-sm text-center border-0"
             initial={{ scale: 0.9, y: 20 }}
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.9, y: 20 }}
@@ -63,7 +62,7 @@ const TransferModal = ({ isOpen, onClose, amount, recipientName, onSuccess }: Tr
                   exit={{ opacity: 0, y: -10 }}
                   className="flex flex-col items-center gap-4"
                 >
-                  <div className="w-16 h-16 rounded-2xl glass flex items-center justify-center">
+                  <div className="w-16 h-16 rounded-2xl glass-liquid flex items-center justify-center">
                     <Shield size={28} className="text-beige" />
                   </div>
                   <div>
@@ -83,7 +82,7 @@ const TransferModal = ({ isOpen, onClose, amount, recipientName, onSuccess }: Tr
                   className="flex flex-col items-center gap-4"
                 >
                   <motion.div
-                    className="w-16 h-16 rounded-2xl glass flex items-center justify-center"
+                    className="w-16 h-16 rounded-2xl glass-liquid flex items-center justify-center"
                     animate={{ scale: [1, 1.05, 1] }}
                     transition={{ duration: 2, repeat: Infinity }}
                   >
@@ -94,7 +93,7 @@ const TransferModal = ({ isOpen, onClose, amount, recipientName, onSuccess }: Tr
                     <p className="text-muted-foreground text-sm mt-1">
                       Confirm {amount.toFixed(2)} € to {recipientName}
                     </p>
-                    <p className="text-muted-foreground text-xs mt-2 animate-pulse-gentle">
+                    <p className="text-muted-foreground text-xs mt-2 animate-pulse">
                       Check your iPhone...
                     </p>
                   </div>
