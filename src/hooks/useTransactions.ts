@@ -28,7 +28,7 @@ export const useTransactions = () => {
         .select('*')
         .eq('user_id', user.id)
         .order('date', { ascending: false })
-        .limit(20);
+        .limit(200);
       setTransactions((data as DbTransaction[]) || []);
       setLoading(false);
     };
