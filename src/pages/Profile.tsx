@@ -19,6 +19,7 @@ import {
 
 const Profile = () => {
   const { signOut, user } = useAuth();
+  const navigate = useNavigate();
   const { profile, updateProfile } = useProfile();
   const { contacts, addContact } = useContacts();
   const [showAddContact, setShowAddContact] = useState(false);
