@@ -6,7 +6,6 @@ struct ContentView: View {
 
     var body: some View {
         ZStack {
-            // Liquid Glass background
             if #available(macOS 26.0, *) {
                 Color.clear
                     .background(.ultraThinMaterial)
@@ -24,6 +23,13 @@ struct ContentView: View {
             }
         }
         .animation(.easeInOut(duration: 0.3), value: isLoading)
+        .onAppear {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
+                if isLoading {
+                    isLoading = false
+                }
+            }
+        }
     }
 }
 
