@@ -217,6 +217,17 @@ const Profile = () => {
             </div>
             <Switch checked={darkMode} disabled />
           </div>
+          <button
+            className="w-full flex items-center gap-2.5 p-3 text-left"
+            onClick={() => navigate('/pair')}
+          >
+            <Monitor size={14} className="text-blue-400 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm text-foreground">Gerät verbinden</p>
+              <p className="text-[10px] text-muted-foreground">Mac mit iPhone koppeln</p>
+            </div>
+            <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+          </button>
         </div>
       </motion.div>
 
