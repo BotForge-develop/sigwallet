@@ -215,7 +215,7 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
         {/* Back Face */}
         <div
           className="absolute inset-0 rounded-2xl metallic-sheen flex flex-col"
-          style={{ backfaceVisibility: 'hidden', transform: 'rotateY(180deg)' }}
+          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden', transform: 'rotateY(180deg)' } as React.CSSProperties}
         >
           {/* Magnetic Stripe */}
           <div className="w-full h-11 bg-foreground/30 mt-5" />
