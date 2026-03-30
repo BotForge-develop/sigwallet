@@ -1,9 +1,12 @@
-// SigWallet Home Screen & Lock Screen Widget
+// SigWallet Home Screen, Lock Screen & StandBy Widget
 // WidgetKit Extension — add as a new target in Xcode:
 //   File → New → Target → Widget Extension
 //   Name: SigWalletWidget
 //   Include Configuration App Intent: NO
 //   Embed in Application: App (SigWallet)
+//
+// IMPORTANT: In Xcode, add the App Group "group.app.lovable.sigwallet"
+// to BOTH the main app target AND this widget extension target.
 
 import WidgetKit
 import SwiftUI
@@ -15,31 +18,48 @@ struct BalanceEntry: TimelineEntry {
     let balance: String
     let cryptoBalance: String
     let lastTransaction: String
+    let lastTxAmount: String
 }
 
 struct BalanceProvider: TimelineProvider {
+    private let defaults = UserDefaults(suiteName: "group.app.lovable.sigwallet") ?? .standard
+
     func placeholder(in context: Context) -> BalanceEntry {
-        BalanceEntry(date: Date(), balance: "1.234,56 €", cryptoBalance: "$420.00", lastTransaction: "Netflix -12,99 €")
+        BalanceEntry(date: Date(), balance: "1.234,56 €", cryptoBalance: "$420.00", lastTransaction: "Netflix", lastTxAmount: "-12,99 €")
     }
 
     func getSnapshot(in context: Context, completion: @escaping (BalanceEntry) -> Void) {
-        let entry = BalanceEntry(date: Date(), balance: "1.234,56 €", cryptoBalance: "$420.00", lastTransaction: "Netflix -12,99 €")
-        completion(entry)
+        completion(currentEntry())
     }
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<BalanceEntry>) -> Void) {
-        // Read from UserDefaults (shared App Group)
-        let defaults = UserDefaults(suiteName: "group.app.lovable.sigwallet") ?? .standard
-        let balance = defaults.string(forKey: "widget_balance") ?? "—"
-        let crypto = defaults.string(forKey: "widget_crypto") ?? ""
-        let lastTx = defaults.string(forKey: "widget_last_tx") ?? ""
+        let entry = currentEntry()
+        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 15, to: Date())!
+        completion(Timeline(entries: [entry], policy: .after(nextUpdate)))
+    }
 
-        let entry = BalanceEntry(date: Date(), balance: balance, cryptoBalance: crypto, lastTransaction: lastTx)
-        let nextUpdate = Calendar.current.date(byAdding: .minute, value: 30, to: Date())!
-        let timeline = Timeline(entries: [entry], policy: .after(nextUpdate))
-        completion(timeline)
+    private func currentEntry() -> BalanceEntry {
+        BalanceEntry(
+            date: Date(),
+            balance: defaults.string(forKey: "widget_balance") ?? "—",
+            cryptoBalance: defaults.string(forKey: "widget_crypto") ?? "",
+            lastTransaction: defaults.string(forKey: "widget_last_tx") ?? "",
+            lastTxAmount: defaults.string(forKey: "widget_last_tx_amount") ?? ""
+        )
     }
 }
+
+// MARK: - Shared Colors
+
+private let beigeGradient = LinearGradient(
+    colors: [
+        Color(hue: 0.17, saturation: 0.56, brightness: 0.91),
+        Color(hue: 0.11, saturation: 0.4, brightness: 0.78)
+    ],
+    startPoint: .topLeading, endPoint: .bottomTrailing
+)
+
+private let beigeColor = Color(hue: 0.17, saturation: 0.3, brightness: 0.91)
 
 // MARK: - Widget Views
 
@@ -53,14 +73,9 @@ struct SmallWidgetView: View {
                     .font(.system(size: 14, weight: .bold))
                     .foregroundStyle(.black)
                     .frame(width: 24, height: 24)
-                    .background(
-                        LinearGradient(colors: [Color(hue: 0.17, saturation: 0.56, brightness: 0.91), Color(hue: 0.11, saturation: 0.4, brightness: 0.78)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                    )
+                    .background(beigeGradient)
                     .clipShape(RoundedRectangle(cornerRadius: 6))
                 Spacer()
-                Text("SigWallet")
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundStyle(.secondary)
             }
 
             Spacer()
@@ -75,6 +90,10 @@ struct SmallWidgetView: View {
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(.secondary)
             }
+
+            Text("Aktualisiert \(entry.date, style: .time)")
+                .font(.system(size: 7))
+                .foregroundStyle(.tertiary)
         }
         .padding(14)
         .containerBackground(.regularMaterial, for: .widget)
@@ -92,9 +111,7 @@ struct MediumWidgetView: View {
                         .font(.system(size: 14, weight: .bold))
                         .foregroundStyle(.black)
                         .frame(width: 24, height: 24)
-                        .background(
-                            LinearGradient(colors: [Color(hue: 0.17, saturation: 0.56, brightness: 0.91), Color(hue: 0.11, saturation: 0.4, brightness: 0.78)], startPoint: .topLeading, endPoint: .bottomTrailing)
-                        )
+                        .background(beigeGradient)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                     Text("SigWallet")
                         .font(.system(size: 10, weight: .medium))
@@ -124,10 +141,17 @@ struct MediumWidgetView: View {
                     .textCase(.uppercase)
 
                 if !entry.lastTransaction.isEmpty {
-                    Text(entry.lastTransaction)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(entry.lastTransaction)
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+                        if !entry.lastTxAmount.isEmpty {
+                            Text(entry.lastTxAmount)
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundStyle(entry.lastTxAmount.hasPrefix("-") ? .red : .green)
+                        }
+                    }
                 } else {
                     Text("Keine neuen")
                         .font(.system(size: 12))
@@ -208,10 +232,14 @@ struct SigWalletLockScreenWidget: Widget {
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: kind, provider: BalanceProvider()) { entry in
-            LockScreenCircularView(entry: entry)
+            if #available(iOSApplicationExtension 17.0, *) {
+                LockScreenCircularView(entry: entry)
+            } else {
+                LockScreenCircularView(entry: entry)
+            }
         }
         .configurationDisplayName("Kontostand")
-        .description("Schnellansicht auf dem Sperrbildschirm.")
+        .description("Schnellansicht auf dem Sperrbildschirm und StandBy.")
         .supportedFamilies([.accessoryCircular, .accessoryInline])
     }
 }
