@@ -1,4 +1,4 @@
-import { Home, ArrowLeftRight, MessageCircle, User } from 'lucide-react';
+import { Home, ArrowLeftRight, Wallet, User } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { hapticLight } from '@/lib/haptics';
@@ -7,8 +7,8 @@ import { Capacitor } from '@capacitor/core';
 const tabs = [
   { icon: Home, label: 'Home', path: '/' },
   { icon: ArrowLeftRight, label: 'Transfer', path: '/transfer' },
-  { icon: MessageCircle, label: 'Chat', path: '/chat' },
-  { icon: User, label: 'Profile', path: '/profile' },
+  { icon: Wallet, label: 'Wallet', path: '/wallet' },
+  { icon: User, label: 'Profil', path: '/profile' },
 ];
 
 const BottomNav = () => {
@@ -21,7 +21,7 @@ const BottomNav = () => {
   if (Capacitor.getPlatform() === 'ios') return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 glass safe-bottom">
+    <div className="fixed bottom-0 left-0 right-0 z-50 glass-liquid safe-bottom">
       <div className="flex items-center justify-around h-14 max-w-md mx-auto">
         {tabs.map((tab) => {
           const isActive = location.pathname === tab.path;

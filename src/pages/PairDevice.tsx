@@ -19,6 +19,12 @@ const PairDevice = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const scanIntervalRef = useRef<number | null>(null);
   const decodedRef = useRef(false);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (scanIntervalRef.current) {
@@ -55,14 +61,18 @@ const PairDevice = () => {
 
     if (new Date(data.expires_at) < new Date()) {
       stopCamera();
-      setError('Pairing abgelaufen');
-      setStatus('error');
+      if (mountedRef.current) {
+        setError('Pairing abgelaufen');
+        setStatus('error');
+      }
       return;
     }
 
     stopCamera();
-    setSessionToken(data.session_token);
-    setStatus('confirm');
+    if (mountedRef.current) {
+      setSessionToken(data.session_token);
+      setStatus('confirm');
+    }
   }, [stopCamera]);
 
   const startScanning = useCallback(() => {
@@ -71,11 +81,7 @@ const PairDevice = () => {
     if (!canvas || !video) return;
 
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    if (!ctx) {
-      setError('Scanner konnte nicht gestartet werden');
-      setStatus('error');
-      return;
-    }
+    if (!ctx) return;
 
     const scanSize = 320;
     canvas.width = scanSize;
@@ -86,7 +92,6 @@ const PairDevice = () => {
 
     scanIntervalRef.current = window.setInterval(() => {
       if (video.readyState < 2 || decodedRef.current) return;
-
       const vw = video.videoWidth;
       const vh = video.videoHeight;
       if (!vw || !vh) return;
@@ -107,9 +112,7 @@ const PairDevice = () => {
 
       if (code === lastCode) {
         confirmCount += 1;
-        if (confirmCount >= 2) {
-          lookupByCode(code);
-        }
+        if (confirmCount >= 2) lookupByCode(code);
       } else {
         lastCode = code;
         confirmCount = 1;
@@ -118,44 +121,45 @@ const PairDevice = () => {
   }, [lookupByCode]);
 
   const startCamera = useCallback(async () => {
+    if (!mountedRef.current) return;
     setError(null);
 
     try {
-      // Request camera permission on native platforms
       if (Capacitor.isNativePlatform()) {
         try {
           const { Camera } = await import('@capacitor/camera');
-          const permission = await Camera.requestPermissions({ permissions: ['camera'] });
-          if (permission.camera !== 'granted' && permission.camera !== 'limited') {
-            setError('Bitte erlaube den Kamerazugriff in den Einstellungen.');
-            setStatus('error');
-            return;
-          }
+          await Camera.requestPermissions({ permissions: ['camera'] });
         } catch {
-          // Camera plugin not available, continue with getUserMedia
+          // Continue with getUserMedia
         }
       }
 
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError('Kamera nicht verfügbar auf diesem Gerät.');
-        setStatus('error');
+        if (mountedRef.current) {
+          setError('Kamera nicht verfügbar auf diesem Gerät.');
+          setStatus('error');
+        }
         return;
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 1280 },
-        },
+        video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 1280 } },
         audio: false,
       });
+
+      if (!mountedRef.current) {
+        stream.getTracks().forEach(t => t.stop());
+        return;
+      }
 
       streamRef.current = stream;
 
       if (!videoRef.current) {
-        setError('Kameravorschau konnte nicht initialisiert werden');
-        setStatus('error');
+        stream.getTracks().forEach(t => t.stop());
+        if (mountedRef.current) {
+          setError('Kameravorschau konnte nicht initialisiert werden');
+          setStatus('error');
+        }
         return;
       }
 
@@ -164,26 +168,30 @@ const PairDevice = () => {
       videoRef.current.muted = true;
 
       await videoRef.current.play();
-      window.setTimeout(startScanning, 300);
+      if (mountedRef.current) {
+        window.setTimeout(startScanning, 400);
+      }
     } catch (err) {
+      if (!mountedRef.current) return;
       const message = err instanceof Error ? err.message : '';
       setError(message || 'Kamera nicht verfügbar');
       setStatus('error');
     }
   }, [startScanning]);
 
-  // Start camera only when status is 'scanning'
   useEffect(() => {
     if (status === 'scanning') {
       decodedRef.current = false;
-      startCamera();
+      const timer = setTimeout(() => startCamera(), 500);
+      return () => { clearTimeout(timer); stopCamera(); };
     }
     return () => stopCamera();
   }, [status, startCamera, stopCamera]);
 
-  // Initial delay to avoid immediate crash
   useEffect(() => {
-    const timer = setTimeout(() => setStatus('scanning'), 300);
+    const timer = setTimeout(() => {
+      if (mountedRef.current) setStatus('scanning');
+    }, 600);
     return () => clearTimeout(timer);
   }, []);
 
@@ -228,13 +236,7 @@ const PairDevice = () => {
       >
         <AnimatePresence mode="wait">
           {(status === 'init' || status === 'scanning') && (
-            <motion.div
-              key="scanning"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-5"
-            >
+            <motion.div key="scanning" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-5">
               <div className="text-center">
                 <h2 className="text-lg font-semibold text-foreground">Gerät verbinden</h2>
                 <p className="text-foreground/50 text-sm mt-2 leading-relaxed">
@@ -246,22 +248,14 @@ const PairDevice = () => {
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                   <AppleParticleCloud active={true} size={224} />
                 </div>
-
                 <div className="absolute inset-7 rounded-full overflow-hidden border border-primary/20 bg-background shadow-lg">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-full object-cover scale-[1.2]"
-                    playsInline
-                    muted
-                    autoPlay
-                  />
+                  <video ref={videoRef} className="w-full h-full object-cover scale-[1.2]" playsInline muted autoPlay />
                   <motion.div
                     className="absolute inset-0 rounded-full border border-primary/30"
                     animate={{ scale: [1, 1.05, 1], opacity: [0.3, 0.6, 0.3] }}
                     transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
                   />
                 </div>
-
                 <canvas ref={canvasRef} className="hidden" />
               </div>
 
@@ -270,10 +264,7 @@ const PairDevice = () => {
                 <p className="text-[11px]">Suche nach Pairing-Signal…</p>
               </div>
 
-              <button
-                onClick={() => navigate('/profile')}
-                className="text-foreground/40 text-sm hover:text-foreground/60 transition-colors"
-              >
+              <button onClick={() => navigate('/profile')} className="text-foreground/40 text-sm hover:text-foreground/60 transition-colors">
                 Abbrechen
               </button>
             </motion.div>
@@ -281,19 +272,19 @@ const PairDevice = () => {
 
           {status === 'confirm' && (
             <motion.div key="confirm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-5">
-              <motion.div className="w-16 h-16 rounded-2xl glass flex items-center justify-center" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
+              <motion.div className="w-16 h-16 rounded-2xl glass-liquid flex items-center justify-center" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
                 <Monitor className="text-foreground/60" size={28} />
               </motion.div>
               <div className="text-center">
                 <h2 className="text-lg font-semibold text-foreground">Gerät erkannt!</h2>
                 <p className="text-foreground/50 text-sm mt-2">Ein macOS-Gerät möchte sich verbinden.</p>
               </div>
-              <div className="glass rounded-xl px-4 py-3 flex items-center gap-3 w-full">
+              <div className="glass-liquid rounded-xl px-4 py-3 flex items-center gap-3 w-full">
                 <Shield className="text-foreground/50 shrink-0" size={16} />
                 <p className="text-foreground/40 text-[11px] leading-relaxed">Das Gerät erhält Zugriff auf dein Konto.</p>
               </div>
               <div className="flex gap-3 w-full mt-2">
-                <button onClick={resetFlow} className="flex-1 glass rounded-xl py-3 flex items-center justify-center gap-2 text-foreground/50 text-sm">
+                <button onClick={resetFlow} className="flex-1 glass-liquid rounded-xl py-3 flex items-center justify-center gap-2 text-foreground/50 text-sm">
                   <X size={16} /> Ablehnen
                 </button>
                 <button onClick={handleApprove} className="flex-1 gradient-beige rounded-xl py-3 flex items-center justify-center gap-2 text-background text-sm font-medium">
@@ -325,7 +316,7 @@ const PairDevice = () => {
                 <X className="text-destructive" size={28} />
               </div>
               <p className="text-foreground/50 text-sm text-center">{error}</p>
-              <button onClick={resetFlow} className="glass rounded-xl px-6 py-2 text-sm text-foreground/50">
+              <button onClick={resetFlow} className="glass-liquid rounded-xl px-6 py-2 text-sm text-foreground/50">
                 Erneut versuchen
               </button>
             </motion.div>
