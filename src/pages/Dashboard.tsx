@@ -13,7 +13,7 @@ import { useWalletBalances } from '@/hooks/useWalletBalances';
 import { COINS, CoinType } from '@/lib/cryptoUtils';
 import SendModal from '@/components/wallet/SendModal';
 import BuyCryptoModal from '@/components/wallet/BuyCryptoModal';
-import { ArrowLeftRight, Send, Zap, Plus, TrendingUp } from 'lucide-react';
+import { ArrowLeftRight, Send, Zap, TrendingUp, Wallet } from 'lucide-react';
 
 const COIN_ID_MAP: Record<string, string> = {
   btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin',
@@ -31,7 +31,7 @@ const Dashboard = () => {
   const [showBuy, setShowBuy] = useState(false);
   const [sendCoin, setSendCoin] = useState<CoinType>('btc');
 
-  const balance = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
+  const fiatBalance = transactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
   const portfolioUsd = COINS.reduce((sum, coin) => {
     const bal = balances[coin.id];
@@ -40,6 +40,8 @@ const Dashboard = () => {
     if (!price) return sum;
     return sum + parseFloat(bal) * price.current_price;
   }, 0);
+
+  const totalBalance = fiatBalance + portfolioUsd;
 
   const getUsdPrice = (coin: CoinType) => {
     const coingeckoId = COIN_ID_MAP[coin];
@@ -63,33 +65,40 @@ const Dashboard = () => {
       transition={{ duration: 0.3 }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <p className="text-muted-foreground text-[10px]">{greeting},</p>
-          <h1 className="text-base font-semibold text-foreground">{profile?.display_name || 'User'}</h1>
-        </div>
+      <div className="mb-2">
+        <p className="text-muted-foreground text-[10px]">{greeting},</p>
+        <h1 className="text-base font-semibold text-foreground">{profile?.display_name || 'User'}</h1>
       </div>
 
-      {/* 3D Card */}
+      {/* Card */}
       <motion.div initial={{ y: 15, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.05, duration: 0.4, type: 'spring' }}>
         <BankCard3D
           last4="7678"
           holderName={profile?.display_name || 'User'}
           iban="DE80 6723 0000 0202 3376 78"
         />
-        <p className="text-center text-[8px] text-muted-foreground mt-1">Halten für Kartennummer</p>
+        <p className="text-center text-[8px] text-muted-foreground mt-1">Halten für Details · Doppelklick zum Kopieren</p>
       </motion.div>
 
-      {/* Balance */}
+      {/* Total Balance */}
       <motion.div className="text-center mt-3 mb-2" initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
+        <p className="text-[10px] text-muted-foreground mb-0.5">Gesamtvermögen</p>
         <p className="text-2xl font-bold text-foreground tracking-tight">
-          {balance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} €
+          {totalBalance.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
         </p>
-        {portfolioUsd > 0 && (
-          <p className="text-[10px] text-beige-muted mt-0.5">
-            + ${portfolioUsd.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} Crypto
-          </p>
-        )}
+        <div className="flex items-center justify-center gap-3 mt-1">
+          <span className="text-[9px] text-muted-foreground">
+            {fiatBalance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € Konto
+          </span>
+          {portfolioUsd > 0 && (
+            <>
+              <span className="w-0.5 h-0.5 rounded-full bg-muted-foreground/40" />
+              <span className="text-[9px] text-beige-muted">
+                {portfolioUsd.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} € Crypto
+              </span>
+            </>
+          )}
+        </div>
       </motion.div>
 
       {/* Quick Actions */}
@@ -100,26 +109,24 @@ const Dashboard = () => {
         <motion.button className="flex-1 h-10 rounded-xl gradient-beige text-primary-foreground text-[10px] font-medium flex items-center justify-center gap-1.5" whileTap={{ scale: 0.97 }} onClick={() => setShowBuy(true)}>
           <Zap size={12} /> Kaufen
         </motion.button>
-        {!hasWallet && (
+        {hasWallet && (
           <motion.button className="h-10 w-10 rounded-xl glass flex items-center justify-center" whileTap={{ scale: 0.97 }} onClick={() => navigate('/wallet')}>
-            <Plus size={14} className="text-beige" />
+            <Wallet size={14} className="text-beige" />
           </motion.button>
         )}
       </motion.div>
 
-      {/* Spending Mini */}
+      {/* Spending */}
       <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
         <div className="glass rounded-2xl p-2.5 mb-2.5">
-          <div className="flex items-center justify-between mb-1">
-            <p className="text-[10px] font-medium text-foreground">Diese Woche</p>
-          </div>
+          <p className="text-[10px] font-medium text-foreground mb-1">Diese Woche</p>
           <div className="h-[60px]">
             <SpendingChart />
           </div>
         </div>
       </motion.div>
 
-      {/* Crypto + Send Combined */}
+      {/* Crypto */}
       <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.22 }}>
         <div className="flex items-center gap-1.5 mb-1.5">
           <TrendingUp size={10} className="text-beige" />
