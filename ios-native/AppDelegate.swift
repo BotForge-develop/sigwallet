@@ -1,6 +1,14 @@
 import UIKit
 import Capacitor
 import WebKit
+import WidgetKit
+import UserNotifications
+
+// Simple token holder for push notification forwarding
+class NotificationsRouter {
+    static let shared = NotificationsRouter()
+    var apnsToken: Data?
+}
 
 /// This is a MINIMAL AppDelegate that lets Capacitor own its lifecycle,
 /// then overlays a native UITabBar AFTER the bridge is ready.
