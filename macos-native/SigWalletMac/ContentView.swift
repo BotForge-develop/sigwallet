@@ -31,9 +31,9 @@ struct ContentView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: isLoading)
         .onAppear {
-            // Safety: force hide loading after 6 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
-                if isLoading { isLoading = false }
+            // Safety: force hide loading after 10 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+                if isLoading && loadError == nil { isLoading = false }
             }
         }
     }
@@ -192,8 +192,18 @@ struct SigWalletWebView: NSViewRepresentable {
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                self.parent.isLoading = false
+            // Check if page actually has content before hiding loader
+            webView.evaluateJavaScript("document.body?.innerHTML?.length || 0") { result, _ in
+                let length = result as? Int ?? 0
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    if length > 50 {
+                        self.parent.isLoading = false
+                    } else {
+                        // Page loaded but is empty — show error
+                        self.parent.loadError = "Die Seite konnte nicht geladen werden."
+                        self.parent.isLoading = true
+                    }
+                }
             }
         }
 

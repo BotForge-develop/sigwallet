@@ -37,6 +37,7 @@ const TransferModal = ({ isOpen, onClose, amount, recipientName, recipientIban, 
           const msg = typeof error === 'object' && 'message' in error ? (error as any).message : String(error);
           setErrorMsg(msg || 'Verbindung zur Bank fehlgeschlagen');
           setState('error');
+          return;
         }
 
         if (data?.error) {
