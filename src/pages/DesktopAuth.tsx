@@ -18,20 +18,23 @@ const DesktopAuth = () => {
     setStatus('generating');
     setError(null);
 
-    const { data, error: insertError } = await supabase
-      .from('pairing_sessions')
-      .insert({ status: 'pending' })
+    const { data, error: insertError } = await supabase.rpc
+    // Use direct insert — anon can insert per RLS
+    const result = await supabase
+      .from('pairing_sessions' as any)
+      .insert({ status: 'pending', user_id: null })
       .select('session_token, pairing_code')
       .single();
 
-    if (insertError || !data) {
-      setError('Pairing-Session konnte nicht erstellt werden');
+    if (result.error || !result.data) {
+      console.error('Pairing insert error:', result.error);
+      setError(result.error?.message || 'Pairing-Session konnte nicht erstellt werden');
       setStatus('error');
       return;
     }
 
-    setSessionToken(data.session_token);
-    setPairingCode(parseInt((data as any).pairing_code, 10));
+    setSessionToken(result.data.session_token);
+    setPairingCode(parseInt(result.data.pairing_code || '0', 10));
     setStatus('waiting');
   }, []);
 
