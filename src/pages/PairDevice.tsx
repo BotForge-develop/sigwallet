@@ -134,7 +134,13 @@ const PairDevice = () => {
         }
       }
 
-      if (!navigator.mediaDevices?.getUserMedia) {
+      // Extra delay on iOS for permission dialog
+      if (Capacitor.getPlatform() === 'ios') {
+        await new Promise(r => setTimeout(r, 600));
+        if (!mountedRef.current) return;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         if (mountedRef.current) {
           setError('Kamera nicht verfügbar auf diesem Gerät.');
           setStatus('error');
@@ -191,7 +197,7 @@ const PairDevice = () => {
   useEffect(() => {
     const timer = setTimeout(() => {
       if (mountedRef.current) setStatus('scanning');
-    }, 600);
+    }, Capacitor.isNativePlatform() ? 800 : 300);
     return () => clearTimeout(timer);
   }, []);
 
