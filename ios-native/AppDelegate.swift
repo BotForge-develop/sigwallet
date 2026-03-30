@@ -129,6 +129,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "routeChange")
         webView.configuration.userContentController.add(self, name: "routeChange")
 
+        // Widget data handler
+        webView.configuration.userContentController.add(self, name: "widgetData")
+
         let script = """
         (function() {
           if (window.__nativeRouteSyncInstalled) return;
@@ -269,9 +272,23 @@ extension AppDelegate: UITabBarDelegate {
 
 extension AppDelegate: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == "routeChange", let route = message.body as? String else { return }
-        DispatchQueue.main.async { [weak self] in
-            self?.applyRoute(route)
+        if message.name == "routeChange", let route = message.body as? String {
+            DispatchQueue.main.async { [weak self] in
+                self?.applyRoute(route)
+            }
+        }
+
+        // Handle widget data updates from web app
+        if message.name == "widgetData", let data = message.body as? [String: String] {
+            if let defaults = UserDefaults(suiteName: "group.app.lovable.sigwallet") {
+                for (key, value) in data {
+                    defaults.set(value, forKey: key)
+                }
+                // Trigger widget timeline refresh
+                if #available(iOS 14.0, *) {
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
+            }
         }
     }
 }
