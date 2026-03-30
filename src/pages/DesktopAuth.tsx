@@ -18,11 +18,9 @@ const DesktopAuth = () => {
     setStatus('generating');
     setError(null);
 
-    const { data, error: insertError } = await supabase.rpc
-    // Use direct insert — anon can insert per RLS
-    const result = await supabase
-      .from('pairing_sessions' as any)
-      .insert({ status: 'pending', user_id: null })
+    const result = await (supabase as any)
+      .from('pairing_sessions')
+      .insert({ status: 'pending' })
       .select('session_token, pairing_code')
       .single();
 
@@ -33,8 +31,8 @@ const DesktopAuth = () => {
       return;
     }
 
-    setSessionToken(result.data.session_token);
-    setPairingCode(parseInt(result.data.pairing_code || '0', 10));
+    setSessionToken((result.data as any).session_token);
+    setPairingCode(parseInt((result.data as any).pairing_code || '0', 10));
     setStatus('waiting');
   }, []);
 
