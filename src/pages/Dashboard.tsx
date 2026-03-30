@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import BankCard3D from '@/components/BankCard3D';
@@ -14,6 +14,7 @@ import { COINS, CoinType } from '@/lib/cryptoUtils';
 import SendModal from '@/components/wallet/SendModal';
 import BuyCryptoModal from '@/components/wallet/BuyCryptoModal';
 import { ArrowUpRight, ArrowDownLeft, Zap, TrendingUp } from 'lucide-react';
+import { Capacitor } from '@capacitor/core';
 
 const COIN_ID_MAP: Record<string, string> = {
   btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin',
@@ -42,6 +43,25 @@ const Dashboard = () => {
   }, 0);
 
   const totalBalance = fiatBalance + portfolioUsd;
+
+  // Push widget data to native iOS (shared UserDefaults → WidgetKit)
+  useEffect(() => {
+    if (Capacitor.getPlatform() !== 'ios') return;
+    try {
+      const widgetData: Record<string, string> = {
+        widget_balance: fiatBalance.toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €',
+        widget_crypto: portfolioUsd > 0
+          ? portfolioUsd.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'
+          : '',
+      };
+      if (transactions.length > 0) {
+        const latest = transactions[0];
+        widgetData.widget_last_tx = latest.name;
+        widgetData.widget_last_tx_amount = Number(latest.amount).toLocaleString('de-DE', { minimumFractionDigits: 2 }) + ' €';
+      }
+      (window as any).webkit?.messageHandlers?.widgetData?.postMessage(widgetData);
+    } catch {}
+  }, [fiatBalance, portfolioUsd, transactions]);
 
   const getUsdPrice = (coin: CoinType) => {
     const coingeckoId = COIN_ID_MAP[coin];
