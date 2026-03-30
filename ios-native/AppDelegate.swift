@@ -1,6 +1,14 @@
 import UIKit
 import Capacitor
 import WebKit
+import WidgetKit
+import UserNotifications
+
+// Simple token holder for push notification forwarding
+class NotificationsRouter {
+    static let shared = NotificationsRouter()
+    var apnsToken: Data?
+}
 
 /// This is a MINIMAL AppDelegate that lets Capacitor own its lifecycle,
 /// then overlays a native UITabBar AFTER the bridge is ready.
@@ -27,6 +35,15 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
+
+        // Register for push notifications
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, _ in
+            if granted {
+                DispatchQueue.main.async {
+                    application.registerForRemoteNotifications()
+                }
+            }
+        }
 
         // Let Capacitor create its own bridge VC as root — DON'T FIGHT IT
         let vc = CAPBridgeViewController()
@@ -120,6 +137,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         webView.configuration.userContentController.removeScriptMessageHandler(forName: "routeChange")
         webView.configuration.userContentController.add(self, name: "routeChange")
 
+        // Widget data handler
+        webView.configuration.userContentController.add(self, name: "widgetData")
+
         let script = """
         (function() {
           if (window.__nativeRouteSyncInstalled) return;
@@ -208,6 +228,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func applicationWillEnterForeground(_ application: UIApplication) {}
     func applicationWillTerminate(_ application: UIApplication) {}
 
+    // MARK: - Push Notifications
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        // Capacitor handles this via the PushNotifications plugin
+        NotificationsRouter.shared.apnsToken = deviceToken
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("[Push] Failed to register: \(error.localizedDescription)")
+    }
+
     func application(
         _ app: UIApplication,
         open url: URL,
@@ -249,9 +280,23 @@ extension AppDelegate: UITabBarDelegate {
 
 extension AppDelegate: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
-        guard message.name == "routeChange", let route = message.body as? String else { return }
-        DispatchQueue.main.async { [weak self] in
-            self?.applyRoute(route)
+        if message.name == "routeChange", let route = message.body as? String {
+            DispatchQueue.main.async { [weak self] in
+                self?.applyRoute(route)
+            }
+        }
+
+        // Handle widget data updates from web app
+        if message.name == "widgetData", let data = message.body as? [String: String] {
+            if let defaults = UserDefaults(suiteName: "group.app.lovable.sigwallet") {
+                for (key, value) in data {
+                    defaults.set(value, forKey: key)
+                }
+                // Trigger widget timeline refresh
+                if #available(iOS 14.0, *) {
+                    WidgetCenter.shared.reloadAllTimelines()
+                }
+            }
         }
     }
 }

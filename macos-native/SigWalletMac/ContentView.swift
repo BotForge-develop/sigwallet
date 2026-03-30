@@ -3,6 +3,7 @@ import WebKit
 
 struct ContentView: View {
     @State private var isLoading = true
+    @State private var loadError: String? = nil
 
     var body: some View {
         ZStack {
@@ -14,20 +15,25 @@ struct ContentView: View {
                 Color.black.ignoresSafeArea()
             }
 
-            SigWalletWebView(isLoading: $isLoading)
+            SigWalletWebView(isLoading: $isLoading, loadError: $loadError)
                 .ignoresSafeArea()
+                .opacity(isLoading ? 0 : 1)
 
             if isLoading {
-                LoadingView()
-                    .transition(.opacity)
+                LoadingView(error: loadError) {
+                    loadError = nil
+                    isLoading = true
+                    // Force reload by toggling — the WebView's updateNSView will re-trigger
+                    NotificationCenter.default.post(name: .init("SigWalletReload"), object: nil)
+                }
+                .transition(.opacity)
             }
         }
         .animation(.easeInOut(duration: 0.3), value: isLoading)
         .onAppear {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4.0) {
-                if isLoading {
-                    isLoading = false
-                }
+            // Safety: force hide loading after 6 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
+                if isLoading { isLoading = false }
             }
         }
     }
@@ -37,38 +43,52 @@ struct ContentView: View {
 
 struct LoadingView: View {
     @State private var rotation: Double = 0
+    let error: String?
+    let onRetry: () -> Void
 
     var body: some View {
         ZStack {
-            Color.black.opacity(0.85)
+            Color.black.opacity(0.9)
                 .ignoresSafeArea()
 
             VStack(spacing: 20) {
-                // Spinning ring
-                Circle()
-                    .trim(from: 0, to: 0.7)
-                    .stroke(
-                        LinearGradient(
-                            colors: [
-                                Color(hue: 0.17, saturation: 0.3, brightness: 0.91),
-                                Color(hue: 0.17, saturation: 0.3, brightness: 0.91).opacity(0.2)
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        ),
-                        style: StrokeStyle(lineWidth: 3, lineCap: .round)
-                    )
-                    .frame(width: 40, height: 40)
-                    .rotationEffect(.degrees(rotation))
-                    .onAppear {
-                        withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
-                            rotation = 360
+                if let error = error {
+                    Text("Verbindungsfehler")
+                        .font(.system(size: 16, weight: .semibold, design: .rounded))
+                        .foregroundColor(.white.opacity(0.7))
+                    Text(error)
+                        .font(.system(size: 12))
+                        .foregroundColor(.white.opacity(0.4))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 40)
+                    Button("Erneut versuchen") { onRetry() }
+                        .buttonStyle(.bordered)
+                        .tint(Color(hue: 0.17, saturation: 0.3, brightness: 0.91))
+                } else {
+                    Circle()
+                        .trim(from: 0, to: 0.7)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hue: 0.17, saturation: 0.3, brightness: 0.91),
+                                    Color(hue: 0.17, saturation: 0.3, brightness: 0.91).opacity(0.2)
+                                ],
+                                startPoint: .topLeading, endPoint: .bottomTrailing
+                            ),
+                            style: StrokeStyle(lineWidth: 3, lineCap: .round)
+                        )
+                        .frame(width: 40, height: 40)
+                        .rotationEffect(.degrees(rotation))
+                        .onAppear {
+                            withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
+                                rotation = 360
+                            }
                         }
-                    }
 
-                Text("SigWallet")
-                    .font(.system(size: 18, weight: .semibold, design: .rounded))
-                    .foregroundColor(Color(hue: 0.17, saturation: 0.3, brightness: 0.91))
+                    Text("SigWallet")
+                        .font(.system(size: 18, weight: .semibold, design: .rounded))
+                        .foregroundColor(Color(hue: 0.17, saturation: 0.3, brightness: 0.91))
+                }
             }
         }
     }
@@ -78,6 +98,7 @@ struct LoadingView: View {
 
 struct SigWalletWebView: NSViewRepresentable {
     @Binding var isLoading: Bool
+    @Binding var loadError: String?
 
     func makeCoordinator() -> Coordinator {
         Coordinator(self)
@@ -106,11 +127,14 @@ struct SigWalletWebView: NSViewRepresentable {
           }
 
           if (document.readyState === 'complete' || document.readyState === 'interactive') {
-            setTimeout(notifyReady, 150);
+            setTimeout(notifyReady, 200);
           } else {
-            document.addEventListener('DOMContentLoaded', function() { setTimeout(notifyReady, 150); }, { once: true });
+            document.addEventListener('DOMContentLoaded', function() { setTimeout(notifyReady, 200); }, { once: true });
           }
-          window.addEventListener('load', function() { setTimeout(notifyReady, 250); }, { once: true });
+          window.addEventListener('load', function() { setTimeout(notifyReady, 300); }, { once: true });
+
+          // Final fallback
+          setTimeout(notifyReady, 3000);
         })();
         """
         let userScript = WKUserScript(source: bootstrapScript, injectionTime: .atDocumentEnd, forMainFrameOnly: true)
@@ -121,11 +145,26 @@ struct SigWalletWebView: NSViewRepresentable {
         webView.setValue(false, forKey: "drawsBackground")
         webView.allowsBackForwardNavigationGestures = true
 
-        if let url = URL(string: "https://sigwallet.lovable.app/desktop-login") {
-            var request = URLRequest(url: url)
-            request.cachePolicy = .reloadIgnoringLocalCacheData
-            request.timeoutInterval = 20
-            webView.load(request)
+        // Listen for reload notifications
+        context.coordinator.webViewRef = webView
+        NotificationCenter.default.addObserver(
+            context.coordinator,
+            selector: #selector(Coordinator.handleReload),
+            name: .init("SigWalletReload"),
+            object: nil
+        )
+
+        // Clear cache on every launch for latest version
+        WKWebsiteDataStore.default().removeData(
+            ofTypes: [WKWebsiteDataTypeDiskCache, WKWebsiteDataTypeMemoryCache],
+            modifiedSince: Date.distantPast
+        ) {
+            if let url = URL(string: "https://sigwallet.lovable.app/desktop-login") {
+                var request = URLRequest(url: url)
+                request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+                request.timeoutInterval = 15
+                webView.load(request)
+            }
         }
 
         return webView
@@ -137,34 +176,44 @@ struct SigWalletWebView: NSViewRepresentable {
 
     class Coordinator: NSObject, WKNavigationDelegate, WKScriptMessageHandler {
         var parent: SigWalletWebView
+        weak var webViewRef: WKWebView?
 
         init(_ parent: SigWalletWebView) {
             self.parent = parent
         }
 
-        func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
-                self.parent.isLoading = false
-            }
+        @objc func handleReload() {
+            guard let webView = webViewRef,
+                  let url = URL(string: "https://sigwallet.lovable.app/desktop-login") else { return }
+            var request = URLRequest(url: url)
+            request.cachePolicy = .reloadIgnoringLocalAndRemoteCacheData
+            request.timeoutInterval = 15
+            webView.load(request)
         }
 
         func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
                 self.parent.isLoading = false
             }
         }
 
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
-            parent.isLoading = false
+            DispatchQueue.main.async {
+                self.parent.loadError = error.localizedDescription
+                self.parent.isLoading = true
+            }
         }
 
         func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
-            parent.isLoading = false
+            DispatchQueue.main.async {
+                self.parent.loadError = error.localizedDescription
+                self.parent.isLoading = true
+            }
         }
 
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             if message.name == "routeChange", let route = message.body as? String {
-                print("[macOS] Route changed: \(route)")
+                print("[macOS] Route: \(route)")
             }
             if message.name == "pageReady" {
                 DispatchQueue.main.async {

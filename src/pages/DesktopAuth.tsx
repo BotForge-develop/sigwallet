@@ -18,20 +18,21 @@ const DesktopAuth = () => {
     setStatus('generating');
     setError(null);
 
-    const { data, error: insertError } = await supabase
+    const result = await (supabase as any)
       .from('pairing_sessions')
       .insert({ status: 'pending' })
       .select('session_token, pairing_code')
       .single();
 
-    if (insertError || !data) {
-      setError('Pairing-Session konnte nicht erstellt werden');
+    if (result.error || !result.data) {
+      console.error('Pairing insert error:', result.error);
+      setError(result.error?.message || 'Pairing-Session konnte nicht erstellt werden');
       setStatus('error');
       return;
     }
 
-    setSessionToken(data.session_token);
-    setPairingCode(parseInt((data as any).pairing_code, 10));
+    setSessionToken((result.data as any).session_token);
+    setPairingCode(parseInt((result.data as any).pairing_code || '0', 10));
     setStatus('waiting');
   }, []);
 

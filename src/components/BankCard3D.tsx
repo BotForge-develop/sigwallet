@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback, useMemo } from 'react';
 import { motion, useMotionValue, useSpring, useTransform, AnimatePresence } from 'framer-motion';
-import { Wifi, Copy, Check } from 'lucide-react';
+import { Wifi, Check } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface BankCard3DProps {
@@ -10,7 +10,7 @@ interface BankCard3DProps {
   iban?: string;
 }
 
-const CARD_THICKNESS = 8; // px — visual edge thickness
+const T = 10; // card thickness in px
 
 const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: BankCard3DProps) => {
   const cardRef = useRef<HTMLDivElement>(null);
@@ -18,10 +18,11 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
   const [showNumber, setShowNumber] = useState(false);
   const [copiedField, setCopiedField] = useState<string | null>(null);
   const holdTimer = useRef<ReturnType<typeof setTimeout>>();
+  const didDrag = useRef(false);
+  const tapTimestamps = useRef<number[]>([]);
 
   const rawRotateX = useMotionValue(0);
   const rawRotateY = useMotionValue(0);
-
   const rotateX = useSpring(rawRotateX, { stiffness: 150, damping: 20 });
   const rotateY = useSpring(rawRotateY, { stiffness: 150, damping: 20 });
 
@@ -34,110 +35,98 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
     navigator.clipboard.writeText(text.replace(/\s/g, '')).then(() => {
       setCopiedField(label);
       toast.success(`${label} kopiert`);
-      setTimeout(() => setCopiedField(null), 1500);
+      setTimeout(() => setCopiedField(null), 2000);
     });
   }, []);
 
+  // Detect double-tap on the whole card (works on iOS touch)
+  const handleDoubleTap = useCallback(() => {
+    if (!showNumber) return;
+    // Determine which face is visible
+    const normY = ((rawRotateY.get() % 360) + 360) % 360;
+    const isBack = normY >= 90 && normY < 270;
+    if (isBack) {
+      copyToClipboard('847', 'CVV');
+    } else {
+      const num = cardNumber || '4291 7832 0551 7678';
+      copyToClipboard(num, 'Kartennummer');
+    }
+  }, [showNumber, rawRotateY, cardNumber, copyToClipboard]);
+
   const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
     setIsDragging(true);
+    didDrag.current = false;
     dragStart.current = {
-      x: e.clientX,
-      y: e.clientY,
-      rotX: rawRotateX.get(),
-      rotY: rawRotateY.get(),
+      x: e.clientX, y: e.clientY,
+      rotX: rawRotateX.get(), rotY: rawRotateY.get(),
     };
-    (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    holdTimer.current = setTimeout(() => setShowNumber(true), 600);
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    holdTimer.current = setTimeout(() => setShowNumber(true), 500);
   }, [rawRotateX, rawRotateY]);
 
   const handlePointerMove = useCallback((e: React.PointerEvent) => {
     if (!isDragging) return;
-    e.preventDefault();
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
-    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
-      if (holdTimer.current) clearTimeout(holdTimer.current);
+    if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+      didDrag.current = true;
+      if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = undefined; }
     }
-    const sensitivity = 0.4;
-    rawRotateY.set(dragStart.current.rotY + dx * sensitivity);
-    rawRotateX.set(dragStart.current.rotX - dy * sensitivity);
+    rawRotateY.set(dragStart.current.rotY + dx * 0.4);
+    rawRotateX.set(dragStart.current.rotX - dy * 0.4);
   }, [isDragging, rawRotateX, rawRotateY]);
 
   const handlePointerUp = useCallback(() => {
     setIsDragging(false);
-    if (holdTimer.current) clearTimeout(holdTimer.current);
+    if (holdTimer.current) { clearTimeout(holdTimer.current); holdTimer.current = undefined; }
     setShowNumber(false);
+
+    // Double-tap detection
+    if (!didDrag.current) {
+      const now = Date.now();
+      tapTimestamps.current.push(now);
+      // Keep only last 2
+      if (tapTimestamps.current.length > 2) tapTimestamps.current.shift();
+      if (tapTimestamps.current.length === 2 && now - tapTimestamps.current[0] < 400) {
+        handleDoubleTap();
+        tapTimestamps.current = [];
+      }
+    }
+
+    // Snap to nearest face
     const currentY = rawRotateY.get();
     const norm = ((currentY % 360) + 360) % 360;
-
     if (norm >= 90 && norm < 270) {
-      const target = currentY - norm + 180;
-      rawRotateY.set(target);
+      rawRotateY.set(currentY - norm + 180);
     } else {
-      const target = norm >= 270 ? currentY - norm + 360 : currentY - norm;
-      rawRotateY.set(target);
+      rawRotateY.set(norm >= 270 ? currentY - norm + 360 : currentY - norm);
     }
     rawRotateX.set(0);
-  }, [rawRotateX, rawRotateY]);
+  }, [rawRotateX, rawRotateY, handleDoubleTap]);
 
   const revealNumber = cardNumber || '4291 7832 0551 7678';
 
   const particles = useMemo(() =>
-    Array.from({ length: 40 }, (_, i) => ({
+    Array.from({ length: 50 }, (_, i) => ({
       id: i,
-      x: (Math.random() - 0.5) * 250,
-      y: (Math.random() - 0.5) * 40,
-      scale: Math.random() * 0.4 + 0.2,
-      delay: Math.random() * 0.2,
-      opacity: Math.random() * 0.5 + 0.3,
+      x: (Math.random() - 0.5) * 280,
+      y: (Math.random() - 0.5) * 50,
+      scale: Math.random() * 0.5 + 0.2,
+      delay: Math.random() * 0.25,
+      opacity: Math.random() * 0.6 + 0.3,
     })), []
   );
 
-  const CopyableText = ({ text, label, className, children }: {
-    text: string; label: string; className?: string; children: React.ReactNode;
-  }) => (
-    <span
-      className={`${className} cursor-pointer active:opacity-60 transition-opacity`}
-      onClick={(e) => {
-        if (e.detail === 2) {
-          e.stopPropagation();
-          e.preventDefault();
-          copyToClipboard(text, label);
-        }
-      }}
-      onTouchEnd={(e) => {
-        // Double-tap detection for touch
-        const now = Date.now();
-        const lastTap = (e.currentTarget as any).__lastTap || 0;
-        if (now - lastTap < 350) {
-          e.stopPropagation();
-          e.preventDefault();
-          copyToClipboard(text, label);
-        }
-        (e.currentTarget as any).__lastTap = now;
-      }}
-    >
-      {copiedField === label ? (
-        <motion.span initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="inline-flex items-center gap-1">
-          <Check size={8} className="text-primary" /> Kopiert
-        </motion.span>
-      ) : children}
-    </span>
-  );
+  const edgeColor = 'hsl(0 0% 12%)';
 
   return (
-    <div
-      className="flex justify-center"
-      style={{ perspective: 1200, touchAction: 'none' }}
-    >
+    <div className="flex justify-center" style={{ perspective: 1200, touchAction: 'none' }}>
       <motion.div
         ref={cardRef}
-        className="relative w-full max-w-[320px] aspect-[1.586/1] cursor-grab active:cursor-grabbing select-none"
+        className="relative w-full max-w-[320px] cursor-grab active:cursor-grabbing select-none"
         style={{
-          rotateX,
-          rotateY,
+          aspectRatio: '1.586 / 1',
+          rotateX, rotateY,
           transformStyle: 'preserve-3d',
           touchAction: 'none',
         }}
@@ -145,23 +134,20 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
-        whileTap={{ scale: 0.98 }}
       >
-        {/* Front Face */}
+        {/* ===== FRONT FACE ===== */}
         <div
           className="absolute inset-0 rounded-2xl metallic-sheen p-5 flex flex-col justify-between"
           style={{
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            transform: 'translateZ(' + (CARD_THICKNESS / 2) + 'px)',
-          } as React.CSSProperties}
+            backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
+            transform: `translateZ(${T / 2}px)`,
+          }}
         >
           <motion.div
             className="absolute inset-0 pointer-events-none rounded-2xl"
             style={{
-              background: useTransform(
-                sheenX,
-                (x) => `linear-gradient(${105 + x * 0.3}deg, transparent 30%, hsla(60, 56%, 91%, ${sheenOpacity.get()}) 50%, transparent 70%)`
+              background: useTransform(sheenX, (x) =>
+                `linear-gradient(${105 + x * 0.3}deg, transparent 30%, hsla(60,56%,91%,${sheenOpacity.get()}) 50%, transparent 70%)`
               ),
             }}
           />
@@ -179,63 +165,49 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
             <div className="relative">
               <AnimatePresence mode="wait">
                 {!showNumber ? (
-                  <motion.p
-                    key="masked"
-                    className="text-foreground/50 text-xs font-light tracking-[0.2em]"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.2 } }}
-                  >
+                  <motion.p key="masked" className="text-foreground/50 text-xs font-light tracking-[0.2em]"
+                    initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+                    exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.2 } }}>
                     •••• •••• •••• {last4}
                   </motion.p>
                 ) : (
                   <motion.div key="revealed" className="relative">
                     {particles.map((p) => (
-                      <motion.span
-                        key={`p-${p.id}`}
+                      <motion.span key={`p-${p.id}`}
                         className="absolute left-1/2 top-1/2 w-[2px] h-[2px] rounded-full bg-beige/40"
                         initial={{ x: 0, y: 0, opacity: p.opacity, scale: 1 }}
                         animate={{ x: p.x, y: p.y, opacity: 0, scale: p.scale }}
                         transition={{ duration: 0.8, delay: p.delay, ease: 'easeOut' }}
                       />
                     ))}
-                    <CopyableText text={revealNumber} label="Kartennummer" className="text-foreground/80 text-xs font-light tracking-[0.2em] flex">
+                    <p className="text-foreground/80 text-xs font-light tracking-[0.2em] flex">
                       {revealNumber.split('').map((char, i) => (
-                        <motion.span
-                          key={i}
+                        <motion.span key={i}
                           initial={{ opacity: 0, y: 6, filter: 'blur(6px)' }}
                           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                          transition={{ duration: 0.35, delay: 0.05 + i * 0.025, ease: [0.22, 1, 0.36, 1] }}
-                        >
+                          transition={{ duration: 0.35, delay: 0.05 + i * 0.025, ease: [0.22, 1, 0.36, 1] }}>
                           {char === ' ' ? '\u00A0' : char}
                         </motion.span>
                       ))}
-                    </CopyableText>
+                    </p>
                   </motion.div>
                 )}
               </AnimatePresence>
               {iban && (
                 <AnimatePresence>
                   {showNumber && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
+                    <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                       transition={{ delay: 0.3, duration: 0.4 }}
-                    >
-                      <CopyableText text={iban} label="IBAN" className="text-foreground/30 text-[7px] tracking-wider mt-0.5 flex">
-                        {iban.split('').map((char, i) => (
-                          <motion.span
-                            key={i}
-                            initial={{ opacity: 0, filter: 'blur(4px)' }}
-                            animate={{ opacity: 1, filter: 'blur(0px)' }}
-                            transition={{ duration: 0.3, delay: 0.3 + i * 0.015 }}
-                          >
-                            {char === ' ' ? '\u00A0' : char}
-                          </motion.span>
-                        ))}
-                      </CopyableText>
-                    </motion.div>
+                      className="text-foreground/30 text-[7px] tracking-wider mt-0.5 flex">
+                      {iban.split('').map((char, i) => (
+                        <motion.span key={i}
+                          initial={{ opacity: 0, filter: 'blur(4px)' }}
+                          animate={{ opacity: 1, filter: 'blur(0px)' }}
+                          transition={{ duration: 0.3, delay: 0.3 + i * 0.015 }}>
+                          {char === ' ' ? '\u00A0' : char}
+                        </motion.span>
+                      ))}
+                    </motion.p>
                   )}
                 </AnimatePresence>
               )}
@@ -245,67 +217,57 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
               <p className="text-foreground/50 text-[11px]">12/29</p>
             </div>
           </div>
+          {copiedField && (
+            <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+              className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-background/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5">
+              <Check size={10} className="text-primary" />
+              <span className="text-[9px] text-foreground/70 font-medium">{copiedField} kopiert</span>
+            </motion.div>
+          )}
           <div className="absolute inset-0 rounded-2xl border border-foreground/[0.06] pointer-events-none" />
         </div>
 
-        {/* Card Edge — Top */}
-        <div
-          className="absolute left-0 right-0 rounded-t-2xl"
-          style={{
-            top: 0,
-            height: CARD_THICKNESS,
-            background: 'linear-gradient(180deg, hsl(0 0% 18%), hsl(0 0% 10%))',
-            transform: `rotateX(90deg) translateZ(${CARD_THICKNESS / 2}px)`,
-            transformOrigin: 'top center',
-          }}
-        />
-        {/* Card Edge — Bottom */}
-        <div
-          className="absolute left-0 right-0 rounded-b-2xl"
-          style={{
-            bottom: 0,
-            height: CARD_THICKNESS,
-            background: 'linear-gradient(0deg, hsl(0 0% 18%), hsl(0 0% 10%))',
-            transform: `rotateX(-90deg) translateZ(${CARD_THICKNESS / 2}px)`,
+        {/* ===== EDGES (seamless) ===== */}
+        <div className="absolute inset-0 pointer-events-none" style={{ transformStyle: 'preserve-3d' }}>
+          {/* Top */}
+          <div style={{
+            position: 'absolute', top: 0, left: 0, right: 0, height: T,
+            background: edgeColor,
+            transform: `translateY(-${T}px) translateZ(${T / 2}px) rotateX(90deg)`,
             transformOrigin: 'bottom center',
-          }}
-        />
-        {/* Card Edge — Left */}
-        <div
-          className="absolute top-0 bottom-0 rounded-l-2xl"
-          style={{
-            left: 0,
-            width: CARD_THICKNESS,
-            background: 'linear-gradient(90deg, hsl(0 0% 14%), hsl(0 0% 10%))',
-            transform: `rotateY(-90deg) translateZ(${CARD_THICKNESS / 2}px)`,
-            transformOrigin: 'left center',
-          }}
-        />
-        {/* Card Edge — Right */}
-        <div
-          className="absolute top-0 bottom-0 rounded-r-2xl"
-          style={{
-            right: 0,
-            width: CARD_THICKNESS,
-            background: 'linear-gradient(-90deg, hsl(0 0% 14%), hsl(0 0% 10%))',
-            transform: `rotateY(90deg) translateZ(${CARD_THICKNESS / 2}px)`,
+          }} />
+          {/* Bottom */}
+          <div style={{
+            position: 'absolute', bottom: 0, left: 0, right: 0, height: T,
+            background: edgeColor,
+            transform: `translateY(${T}px) translateZ(${T / 2}px) rotateX(-90deg)`,
+            transformOrigin: 'top center',
+          }} />
+          {/* Left */}
+          <div style={{
+            position: 'absolute', top: 0, bottom: 0, left: 0, width: T,
+            background: `linear-gradient(90deg, hsl(0 0% 10%), ${edgeColor})`,
+            transform: `translateX(-${T}px) translateZ(${T / 2}px) rotateY(-90deg)`,
             transformOrigin: 'right center',
-          }}
-        />
+          }} />
+          {/* Right */}
+          <div style={{
+            position: 'absolute', top: 0, bottom: 0, right: 0, width: T,
+            background: `linear-gradient(-90deg, hsl(0 0% 10%), ${edgeColor})`,
+            transform: `translateX(${T}px) translateZ(${T / 2}px) rotateY(90deg)`,
+            transformOrigin: 'left center',
+          }} />
+        </div>
 
-        {/* Back Face */}
+        {/* ===== BACK FACE ===== */}
         <div
           className="absolute inset-0 rounded-2xl metallic-sheen flex flex-col"
           style={{
-            backfaceVisibility: 'hidden',
-            WebkitBackfaceVisibility: 'hidden',
-            transform: `rotateY(180deg) translateZ(${CARD_THICKNESS / 2}px)`,
-          } as React.CSSProperties}
+            backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden',
+            transform: `rotateY(180deg) translateZ(${T / 2}px)`,
+          }}
         >
-          {/* Magnetic Stripe */}
           <div className="w-full h-11 bg-foreground/30 mt-5" />
-
-          {/* Signature Strip + CVV */}
           <div className="px-4 mt-2.5 flex items-center gap-2.5">
             <div className="flex-1">
               <p className="text-foreground/20 text-[6px] mb-0.5">AUTHORIZED SIGNATURE</p>
@@ -318,33 +280,26 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
               <div className="bg-foreground/10 rounded px-2.5 py-1 border border-foreground/10">
                 <AnimatePresence mode="wait">
                   {!showNumber ? (
-                    <motion.p
-                      key="cvv-masked"
-                      className="text-foreground/50 text-xs font-mono tracking-widest"
-                      exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.15 } }}
-                    >
+                    <motion.p key="cvv-masked" className="text-foreground/50 text-xs font-mono tracking-widest"
+                      exit={{ opacity: 0, filter: 'blur(4px)', transition: { duration: 0.15 } }}>
                       •••
                     </motion.p>
                   ) : (
-                    <CopyableText text="847" label="CVV" className="text-foreground/70 text-xs font-mono tracking-widest flex">
+                    <p className="text-foreground/70 text-xs font-mono tracking-widest flex">
                       {'847'.split('').map((d, i) => (
-                        <motion.span
-                          key={i}
+                        <motion.span key={i}
                           initial={{ opacity: 0, y: 4, filter: 'blur(6px)' }}
                           animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                          transition={{ duration: 0.3, delay: 0.2 + i * 0.08 }}
-                        >
+                          transition={{ duration: 0.3, delay: 0.2 + i * 0.08 }}>
                           {d}
                         </motion.span>
                       ))}
-                    </CopyableText>
+                    </p>
                   )}
                 </AnimatePresence>
               </div>
             </div>
           </div>
-
-          {/* Card Info */}
           <div className="px-4 pb-2 mt-auto">
             <div className="flex items-center justify-between mb-1">
               <div className="flex items-center gap-1.5">
@@ -364,6 +319,13 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
               </p>
             </div>
           </div>
+          {copiedField && (
+            <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }}
+              className="absolute bottom-2 left-1/2 -translate-x-1/2 z-20 bg-background/80 backdrop-blur-sm rounded-full px-3 py-1 flex items-center gap-1.5">
+              <Check size={10} className="text-primary" />
+              <span className="text-[9px] text-foreground/70 font-medium">{copiedField} kopiert</span>
+            </motion.div>
+          )}
           <div className="absolute inset-0 rounded-2xl border border-foreground/[0.06] pointer-events-none" />
         </div>
       </motion.div>
