@@ -154,6 +154,7 @@ const Transfer = () => {
         onClose={() => { setShowModal(false); setAmount(''); setSelectedContact(null); setManualMode(false); setRecipientName(''); setRecipientIban(''); }}
         amount={parseFloat(amount) || 0}
         recipientName={selectedContact?.name || recipientName || 'Empfänger'}
+        recipientIban={selectedContact?.iban || recipientIban || ''}
         onSuccess={() => {}}
       />
     </motion.div>
