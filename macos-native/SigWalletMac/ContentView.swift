@@ -31,9 +31,9 @@ struct ContentView: View {
         }
         .animation(.easeInOut(duration: 0.3), value: isLoading)
         .onAppear {
-            // Safety: force hide loading after 6 seconds
-            DispatchQueue.main.asyncAfter(deadline: .now() + 6.0) {
-                if isLoading { isLoading = false }
+            // Safety: force hide loading after 10 seconds
+            DispatchQueue.main.asyncAfter(deadline: .now() + 10.0) {
+                if isLoading && loadError == nil { isLoading = false }
             }
         }
     }
