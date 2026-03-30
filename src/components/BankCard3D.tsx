@@ -10,6 +10,8 @@ interface BankCard3DProps {
   iban?: string;
 }
 
+const CARD_THICKNESS = 8; // px — visual edge thickness
+
 const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: BankCard3DProps) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -55,6 +57,9 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
     e.preventDefault();
     const dx = e.clientX - dragStart.current.x;
     const dy = e.clientY - dragStart.current.y;
+    if (Math.abs(dx) > 6 || Math.abs(dy) > 6) {
+      if (holdTimer.current) clearTimeout(holdTimer.current);
+    }
     const sensitivity = 0.4;
     rawRotateY.set(dragStart.current.rotY + dx * sensitivity);
     rawRotateX.set(dragStart.current.rotX - dy * sensitivity);
@@ -95,7 +100,24 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
   }) => (
     <span
       className={`${className} cursor-pointer active:opacity-60 transition-opacity`}
-      onDoubleClick={(e) => { e.stopPropagation(); copyToClipboard(text, label); }}
+      onClick={(e) => {
+        if (e.detail === 2) {
+          e.stopPropagation();
+          e.preventDefault();
+          copyToClipboard(text, label);
+        }
+      }}
+      onTouchEnd={(e) => {
+        // Double-tap detection for touch
+        const now = Date.now();
+        const lastTap = (e.currentTarget as any).__lastTap || 0;
+        if (now - lastTap < 350) {
+          e.stopPropagation();
+          e.preventDefault();
+          copyToClipboard(text, label);
+        }
+        (e.currentTarget as any).__lastTap = now;
+      }}
     >
       {copiedField === label ? (
         <motion.span initial={{ scale: 0.8 }} animate={{ scale: 1 }} className="inline-flex items-center gap-1">
@@ -112,7 +134,7 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
     >
       <motion.div
         ref={cardRef}
-        className="relative w-full max-w-[320px] aspect-[1.586/1] rounded-2xl cursor-grab active:cursor-grabbing select-none"
+        className="relative w-full max-w-[320px] aspect-[1.586/1] cursor-grab active:cursor-grabbing select-none"
         style={{
           rotateX,
           rotateY,
@@ -128,7 +150,11 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
         {/* Front Face */}
         <div
           className="absolute inset-0 rounded-2xl metallic-sheen p-5 flex flex-col justify-between"
-          style={{ backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' } as React.CSSProperties}
+          style={{
+            backfaceVisibility: 'hidden',
+            WebkitBackfaceVisibility: 'hidden',
+            transform: 'translateZ(' + (CARD_THICKNESS / 2) + 'px)',
+          } as React.CSSProperties}
         >
           <motion.div
             className="absolute inset-0 pointer-events-none rounded-2xl"
@@ -222,14 +248,59 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
           <div className="absolute inset-0 rounded-2xl border border-foreground/[0.06] pointer-events-none" />
         </div>
 
-        {/* Back Face — use rotateY(180deg) on the OUTER wrapper to avoid iOS compositing bugs */}
-        <motion.div
+        {/* Card Edge — Top */}
+        <div
+          className="absolute left-0 right-0 rounded-t-2xl"
+          style={{
+            top: 0,
+            height: CARD_THICKNESS,
+            background: 'linear-gradient(180deg, hsl(0 0% 18%), hsl(0 0% 10%))',
+            transform: `rotateX(90deg) translateZ(${CARD_THICKNESS / 2}px)`,
+            transformOrigin: 'top center',
+          }}
+        />
+        {/* Card Edge — Bottom */}
+        <div
+          className="absolute left-0 right-0 rounded-b-2xl"
+          style={{
+            bottom: 0,
+            height: CARD_THICKNESS,
+            background: 'linear-gradient(0deg, hsl(0 0% 18%), hsl(0 0% 10%))',
+            transform: `rotateX(-90deg) translateZ(${CARD_THICKNESS / 2}px)`,
+            transformOrigin: 'bottom center',
+          }}
+        />
+        {/* Card Edge — Left */}
+        <div
+          className="absolute top-0 bottom-0 rounded-l-2xl"
+          style={{
+            left: 0,
+            width: CARD_THICKNESS,
+            background: 'linear-gradient(90deg, hsl(0 0% 14%), hsl(0 0% 10%))',
+            transform: `rotateY(-90deg) translateZ(${CARD_THICKNESS / 2}px)`,
+            transformOrigin: 'left center',
+          }}
+        />
+        {/* Card Edge — Right */}
+        <div
+          className="absolute top-0 bottom-0 rounded-r-2xl"
+          style={{
+            right: 0,
+            width: CARD_THICKNESS,
+            background: 'linear-gradient(-90deg, hsl(0 0% 14%), hsl(0 0% 10%))',
+            transform: `rotateY(90deg) translateZ(${CARD_THICKNESS / 2}px)`,
+            transformOrigin: 'right center',
+          }}
+        />
+
+        {/* Back Face */}
+        <div
           className="absolute inset-0 rounded-2xl metallic-sheen flex flex-col"
           style={{
             backfaceVisibility: 'hidden',
             WebkitBackfaceVisibility: 'hidden',
-            rotateY: 180,
-          } as any}
+            transform: `rotateY(180deg) translateZ(${CARD_THICKNESS / 2}px)`,
+          } as React.CSSProperties}
         >
           {/* Magnetic Stripe */}
           <div className="w-full h-11 bg-foreground/30 mt-5" />
@@ -294,7 +365,7 @@ const BankCard3D = ({ last4 = '7678', cardNumber, holderName = 'Simon', iban }: 
             </div>
           </div>
           <div className="absolute inset-0 rounded-2xl border border-foreground/[0.06] pointer-events-none" />
-        </motion.div>
+        </div>
       </motion.div>
     </div>
   );

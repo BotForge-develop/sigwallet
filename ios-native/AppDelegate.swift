@@ -19,8 +19,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     private let tabDefinitions: [(title: String, image: String, route: String)] = [
         ("Home", "house.fill", "/"),
         ("Transfer", "arrow.left.arrow.right", "/transfer"),
-        ("Chat", "message.fill", "/chat"),
-        ("Profile", "person.fill", "/profile"),
+        ("Wallet", "wallet.bifold.fill", "/wallet"),
+        ("Profil", "person.fill", "/profile"),
     ]
 
     func application(

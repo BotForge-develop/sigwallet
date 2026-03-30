@@ -13,7 +13,7 @@ import { useWalletBalances } from '@/hooks/useWalletBalances';
 import { COINS, CoinType } from '@/lib/cryptoUtils';
 import SendModal from '@/components/wallet/SendModal';
 import BuyCryptoModal from '@/components/wallet/BuyCryptoModal';
-import { ArrowLeftRight, Send, Zap, TrendingUp, Wallet } from 'lucide-react';
+import { ArrowUpRight, ArrowDownLeft, Zap, TrendingUp } from 'lucide-react';
 
 const COIN_ID_MAP: Record<string, string> = {
   btc: 'bitcoin', eth: 'ethereum', ltc: 'litecoin',
@@ -65,28 +65,18 @@ const Dashboard = () => {
       transition={{ duration: 0.3 }}
     >
       {/* Header */}
-      <div className="mb-2">
-        <p className="text-muted-foreground text-[10px]">{greeting},</p>
-        <h1 className="text-base font-semibold text-foreground">{profile?.display_name || 'User'}</h1>
+      <div className="mb-4">
+        <p className="text-muted-foreground text-[10px] tracking-wider uppercase">{greeting}</p>
+        <h1 className="text-lg font-semibold text-foreground">{profile?.display_name || 'User'}</h1>
       </div>
 
-      {/* Card */}
-      <motion.div initial={{ y: 15, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.05, duration: 0.4, type: 'spring' }}>
-        <BankCard3D
-          last4="7678"
-          holderName={profile?.display_name || 'User'}
-          iban="DE80 6723 0000 0202 3376 78"
-        />
-        <p className="text-center text-[8px] text-muted-foreground mt-1">Halten für Details · Doppelklick zum Kopieren</p>
-      </motion.div>
-
       {/* Total Balance */}
-      <motion.div className="text-center mt-3 mb-2" initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
+      <motion.div className="mb-5" initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.05 }}>
         <p className="text-[10px] text-muted-foreground mb-0.5">Gesamtvermögen</p>
-        <p className="text-2xl font-bold text-foreground tracking-tight">
+        <p className="text-3xl font-bold text-foreground tracking-tight">
           {totalBalance.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
         </p>
-        <div className="flex items-center justify-center gap-3 mt-1">
+        <div className="flex items-center gap-3 mt-1">
           <span className="text-[9px] text-muted-foreground">
             {fiatBalance.toLocaleString('de-DE', { minimumFractionDigits: 2 })} € Konto
           </span>
@@ -102,25 +92,32 @@ const Dashboard = () => {
       </motion.div>
 
       {/* Quick Actions */}
-      <motion.div className="flex gap-1.5 mb-3" initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.15 }}>
-        <motion.button className="flex-1 h-10 rounded-xl glass text-[10px] font-medium flex items-center justify-center gap-1.5 text-foreground" whileTap={{ scale: 0.97 }} onClick={() => navigate('/transfer')}>
-          <ArrowLeftRight size={12} /> Transfer
+      <motion.div className="flex gap-2 mb-5" initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.1 }}>
+        <motion.button className="flex-1 h-11 rounded-2xl glass-liquid text-[11px] font-medium flex items-center justify-center gap-2 text-foreground" whileTap={{ scale: 0.97 }} onClick={() => navigate('/transfer')}>
+          <ArrowUpRight size={14} className="text-beige" /> Senden
         </motion.button>
-        <motion.button className="flex-1 h-10 rounded-xl gradient-beige text-primary-foreground text-[10px] font-medium flex items-center justify-center gap-1.5" whileTap={{ scale: 0.97 }} onClick={() => setShowBuy(true)}>
-          <Zap size={12} /> Kaufen
+        <motion.button className="flex-1 h-11 rounded-2xl glass-liquid text-[11px] font-medium flex items-center justify-center gap-2 text-foreground" whileTap={{ scale: 0.97 }} onClick={() => setShowBuy(true)}>
+          <Zap size={14} className="text-beige" /> Kaufen
         </motion.button>
-        {hasWallet && (
-          <motion.button className="h-10 w-10 rounded-xl glass flex items-center justify-center" whileTap={{ scale: 0.97 }} onClick={() => navigate('/wallet')}>
-            <Wallet size={14} className="text-beige" />
-          </motion.button>
-        )}
+        <motion.button className="flex-1 h-11 rounded-2xl glass-liquid text-[11px] font-medium flex items-center justify-center gap-2 text-foreground" whileTap={{ scale: 0.97 }} onClick={() => navigate('/transactions')}>
+          <ArrowDownLeft size={14} className="text-beige" /> Verlauf
+        </motion.button>
+      </motion.div>
+
+      {/* Card */}
+      <motion.div className="mb-5" initial={{ y: 15, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.12, duration: 0.4, type: 'spring' }}>
+        <BankCard3D
+          last4="7678"
+          holderName={profile?.display_name || 'User'}
+          iban="DE80 6723 0000 0202 3376 78"
+        />
+        <p className="text-center text-[8px] text-muted-foreground mt-1.5">Halten für Details · Doppeltippen zum Kopieren</p>
       </motion.div>
 
       {/* Spending */}
-      <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.2 }}>
-        <div className="glass rounded-2xl p-2.5 mb-2.5">
-          <p className="text-[10px] font-medium text-foreground mb-1">Diese Woche</p>
-          <div className="h-[60px]">
+      <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.18 }}>
+        <div className="glass-liquid rounded-2xl p-3 mb-4">
+          <div className="h-[70px]">
             <SpendingChart />
           </div>
         </div>
@@ -128,16 +125,16 @@ const Dashboard = () => {
 
       {/* Crypto */}
       <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.22 }}>
-        <div className="flex items-center gap-1.5 mb-1.5">
-          <TrendingUp size={10} className="text-beige" />
-          <p className="text-[10px] font-medium text-foreground">Märkte</p>
+        <div className="flex items-center gap-1.5 mb-2">
+          <TrendingUp size={12} className="text-beige" />
+          <p className="text-[11px] font-medium text-foreground">Märkte</p>
           <div className="flex items-center gap-1 ml-auto">
             <span className="w-1 h-1 rounded-full bg-success animate-pulse" />
             <p className="text-[8px] text-muted-foreground">Live</p>
           </div>
         </div>
 
-        <div className="glass rounded-2xl px-2 divide-y divide-border mb-2.5">
+        <div className="glass-liquid rounded-2xl px-2 divide-y divide-border/50 mb-4">
           {cryptoLoading ? (
             <div className="py-4 text-center text-muted-foreground text-[10px]">Laden...</div>
           ) : prices.length === 0 ? (
@@ -147,20 +144,7 @@ const Dashboard = () => {
               const walletCoinId = Object.entries(COIN_ID_MAP).find(([_, v]) => v === coin.id)?.[0] as CoinType | undefined;
               const coinBalance = walletCoinId ? balances[walletCoinId] : undefined;
               return (
-                <div key={coin.id} className="flex items-center gap-1">
-                  <div className="flex-1">
-                    <CryptoRow coin={coin} index={i} balance={coinBalance} />
-                  </div>
-                  {hasWallet && walletCoinId && (
-                    <motion.button
-                      className="shrink-0 w-7 h-7 rounded-lg glass flex items-center justify-center mr-1"
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => handleSend(walletCoinId)}
-                    >
-                      <Send size={10} className="text-beige" />
-                    </motion.button>
-                  )}
-                </div>
+                <CryptoRow key={coin.id} coin={coin} index={i} balance={coinBalance} onClick={() => walletCoinId && handleSend(walletCoinId)} />
               );
             })
           )}
@@ -169,17 +153,17 @@ const Dashboard = () => {
 
       {/* Transactions */}
       <motion.div initial={{ y: 10, opacity: 0 }} animate={{ y: 0, opacity: 1 }} transition={{ delay: 0.25 }}>
-        <div className="flex items-center justify-between mb-1.5">
-          <p className="text-[10px] font-medium text-foreground">Letzte Transaktionen</p>
-          <button className="text-[8px] text-beige-muted" onClick={() => navigate('/transactions')}>Alle →</button>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-[11px] font-medium text-foreground">Letzte Transaktionen</p>
+          <button className="text-[9px] text-beige-muted" onClick={() => navigate('/transactions')}>Alle →</button>
         </div>
-        <div className="glass rounded-2xl px-2 divide-y divide-border">
+        <div className="glass-liquid rounded-2xl px-2 divide-y divide-border/50">
           {loading ? (
             <div className="py-4 text-center text-muted-foreground text-[10px]">Laden...</div>
           ) : transactions.length === 0 ? (
             <div className="py-4 text-center text-muted-foreground text-[10px]">Noch keine Transaktionen</div>
           ) : (
-            transactions.slice(0, 4).map((t, i) => (
+            transactions.slice(0, 5).map((t, i) => (
               <TransactionRow key={t.id} transaction={{
                 id: t.id, name: t.name, category: t.category || 'Sonstiges',
                 amount: Number(t.amount), date: t.date, icon: t.icon || 'ArrowLeftRight',
