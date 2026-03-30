@@ -25,17 +25,15 @@ serve(async (req) => {
       { global: { headers: { Authorization: authHeader } } },
     );
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claims, error: authError } = await supabase.auth.getClaims(token);
-    if (authError || !claims?.claims) {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    const userId = claims.claims.sub;
+    const userId = user.id;
 
-    // Get user's API endpoint from profile
     const adminClient = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
@@ -48,7 +46,7 @@ serve(async (req) => {
       .single();
 
     if (!profile?.api_endpoint_url) {
-      return new Response(JSON.stringify({ error: 'No API endpoint configured. Set it in your profile.' }), {
+      return new Response(JSON.stringify({ error: 'Kein API-Endpunkt konfiguriert. Bitte in deinem Profil setzen.' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -56,12 +54,11 @@ serve(async (req) => {
     const { amount, recipient_iban, recipient_name } = await req.json();
 
     if (!amount || !recipient_iban) {
-      return new Response(JSON.stringify({ error: 'Missing amount or recipient_iban' }), {
+      return new Response(JSON.stringify({ error: 'Betrag und IBAN sind erforderlich' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Forward transfer request to the user's local Python server
     const response = await fetch(`${profile.api_endpoint_url}/transfer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -77,9 +74,8 @@ serve(async (req) => {
 
     if (!response.ok) {
       return new Response(JSON.stringify({ 
-        error: 'Transfer failed', 
+        error: result.error || 'Transfer fehlgeschlagen', 
         details: result,
-        status: response.status,
       }), {
         status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });

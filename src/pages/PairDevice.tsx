@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
-import { Camera } from '@capacitor/camera';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,7 +11,7 @@ import AppleParticleCloud from '@/components/AppleParticleCloud';
 const PairDevice = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [status, setStatus] = useState<'scanning' | 'confirm' | 'approving' | 'done' | 'error'>('scanning');
+  const [status, setStatus] = useState<'init' | 'scanning' | 'confirm' | 'approving' | 'done' | 'error'>('init');
   const [error, setError] = useState<string | null>(null);
   const [sessionToken, setSessionToken] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -26,12 +25,10 @@ const PairDevice = () => {
       clearInterval(scanIntervalRef.current);
       scanIntervalRef.current = null;
     }
-
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
     }
-
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -124,17 +121,23 @@ const PairDevice = () => {
     setError(null);
 
     try {
+      // Request camera permission on native platforms
       if (Capacitor.isNativePlatform()) {
-        const permission = await Camera.requestPermissions({ permissions: ['camera'] });
-        if (permission.camera !== 'granted' && permission.camera !== 'limited') {
-          setError('Bitte erlaube den Kamerazugriff in iOS und starte dann erneut.');
-          setStatus('error');
-          return;
+        try {
+          const { Camera } = await import('@capacitor/camera');
+          const permission = await Camera.requestPermissions({ permissions: ['camera'] });
+          if (permission.camera !== 'granted' && permission.camera !== 'limited') {
+            setError('Bitte erlaube den Kamerazugriff in den Einstellungen.');
+            setStatus('error');
+            return;
+          }
+        } catch {
+          // Camera plugin not available, continue with getUserMedia
         }
       }
 
       if (!navigator.mediaDevices?.getUserMedia) {
-        setError('Kamera-API ist in dieser App-Version noch nicht verfügbar. Bitte npx cap sync ios ausführen und die App neu bauen.');
+        setError('Kamera nicht verfügbar auf diesem Gerät.');
         setStatus('error');
         return;
       }
@@ -169,14 +172,20 @@ const PairDevice = () => {
     }
   }, [startScanning]);
 
+  // Start camera only when status is 'scanning'
   useEffect(() => {
     if (status === 'scanning') {
       decodedRef.current = false;
       startCamera();
     }
-
     return () => stopCamera();
   }, [status, startCamera, stopCamera]);
+
+  // Initial delay to avoid immediate crash
+  useEffect(() => {
+    const timer = setTimeout(() => setStatus('scanning'), 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleApprove = async () => {
     if (!sessionToken || !user) return;
@@ -218,7 +227,7 @@ const PairDevice = () => {
         transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       >
         <AnimatePresence mode="wait">
-          {status === 'scanning' && (
+          {(status === 'init' || status === 'scanning') && (
             <motion.div
               key="scanning"
               initial={{ opacity: 0 }}
@@ -271,75 +280,38 @@ const PairDevice = () => {
           )}
 
           {status === 'confirm' && (
-            <motion.div
-              key="confirm"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="flex flex-col items-center gap-5"
-            >
-              <motion.div
-                className="w-16 h-16 rounded-2xl glass flex items-center justify-center"
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-              >
+            <motion.div key="confirm" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex flex-col items-center gap-5">
+              <motion.div className="w-16 h-16 rounded-2xl glass flex items-center justify-center" initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
                 <Monitor className="text-foreground/60" size={28} />
               </motion.div>
-
               <div className="text-center">
                 <h2 className="text-lg font-semibold text-foreground">Gerät erkannt!</h2>
-                <p className="text-foreground/50 text-sm mt-2">
-                  Ein macOS-Gerät möchte sich verbinden.
-                </p>
+                <p className="text-foreground/50 text-sm mt-2">Ein macOS-Gerät möchte sich verbinden.</p>
               </div>
-
               <div className="glass rounded-xl px-4 py-3 flex items-center gap-3 w-full">
                 <Shield className="text-foreground/50 shrink-0" size={16} />
-                <p className="text-foreground/40 text-[11px] leading-relaxed">
-                  Das Gerät erhält Zugriff auf dein Konto.
-                </p>
+                <p className="text-foreground/40 text-[11px] leading-relaxed">Das Gerät erhält Zugriff auf dein Konto.</p>
               </div>
-
               <div className="flex gap-3 w-full mt-2">
-                <button
-                  onClick={resetFlow}
-                  className="flex-1 glass rounded-xl py-3 flex items-center justify-center gap-2 text-foreground/50 text-sm"
-                >
-                  <X size={16} />
-                  Ablehnen
+                <button onClick={resetFlow} className="flex-1 glass rounded-xl py-3 flex items-center justify-center gap-2 text-foreground/50 text-sm">
+                  <X size={16} /> Ablehnen
                 </button>
-                <button
-                  onClick={handleApprove}
-                  className="flex-1 gradient-beige rounded-xl py-3 flex items-center justify-center gap-2 text-background text-sm font-medium"
-                >
-                  <Check size={16} />
-                  Verbinden
+                <button onClick={handleApprove} className="flex-1 gradient-beige rounded-xl py-3 flex items-center justify-center gap-2 text-background text-sm font-medium">
+                  <Check size={16} /> Verbinden
                 </button>
               </div>
             </motion.div>
           )}
 
           {status === 'approving' && (
-            <motion.div
-              key="approving"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="py-8 flex flex-col items-center gap-4"
-            >
+            <motion.div key="approving" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="py-8 flex flex-col items-center gap-4">
               <div className="w-10 h-10 border-2 border-primary/20 border-t-primary rounded-full animate-spin" />
               <p className="text-foreground/50 text-sm">Verbinde...</p>
             </motion.div>
           )}
 
           {status === 'done' && (
-            <motion.div
-              key="done"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="py-8 flex flex-col items-center gap-4"
-            >
+            <motion.div key="done" initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} className="py-8 flex flex-col items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center">
                 <Check className="text-primary" size={28} />
               </div>
@@ -348,20 +320,12 @@ const PairDevice = () => {
           )}
 
           {status === 'error' && (
-            <motion.div
-              key="error"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="py-8 flex flex-col items-center gap-4"
-            >
+            <motion.div key="error" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-8 flex flex-col items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-destructive/10 border border-destructive/20 flex items-center justify-center">
                 <X className="text-destructive" size={28} />
               </div>
               <p className="text-foreground/50 text-sm text-center">{error}</p>
-              <button
-                onClick={resetFlow}
-                className="glass rounded-xl px-6 py-2 text-sm text-foreground/50"
-              >
+              <button onClick={resetFlow} className="glass rounded-xl px-6 py-2 text-sm text-foreground/50">
                 Erneut versuchen
               </button>
             </motion.div>
